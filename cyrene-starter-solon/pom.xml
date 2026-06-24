@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <parent>
+        <groupId>net.cocotea</groupId>
+        <artifactId>cyrene-admin</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>cyrene-starter-solon</artifactId>
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <packaging>jar</packaging>
+
+    <properties>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <solon.version>3.7.2</solon.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>net.cocotea</groupId>
+            <artifactId>cyrene-common</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>net.cocotea</groupId>
+            <artifactId>cyrene-service-system</artifactId>
+        </dependency>
+
+        <!-- solon -->
+        <dependency>
+            <groupId>org.noear</groupId>
+            <artifactId>solon-web</artifactId>
+            <version>${solon.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.noear</groupId>
+            <artifactId>solon-security-validation</artifactId>
+            <version>${solon.version}</version>
+        </dependency>
+        <!--sqltoy-solon-->
+        <dependency>
+            <groupId>com.sagframe</groupId>
+            <artifactId>sagacity-sqltoy-solon-plugin</artifactId>
+            <version>5.6.57.1</version>
+        </dependency>
+        <!-- Sa-Token 权限认证-->
+        <dependency>
+            <groupId>org.noear</groupId>
+            <artifactId>sa-token-solon-plugin</artifactId>
+            <version>${solon.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>cn.dev33</groupId>
+            <artifactId>sa-token-redisx</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>cn.dev33</groupId>
+            <artifactId>sa-token-fastjson2</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.noear</groupId>
+            <artifactId>solon-serialization-fastjson2</artifactId>
+            <version>${solon.version}</version>
+        </dependency>
+
+        <!-- lombok -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.noear</groupId>
+            <artifactId>solon-config-banner</artifactId>
+            <version>${solon.version}</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>launcher</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.noear</groupId>
+                <artifactId>solon-maven-plugin</artifactId>
+                <configuration>
+                    <!-- 指定启动主类 -->
+                    <mainClass>net.cocotea.cyreneadmin.SolonStarter</mainClass>
+                </configuration>
+                <executions>
+                    <!-- 没有 solon-parent 时，要加这块-->
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>
