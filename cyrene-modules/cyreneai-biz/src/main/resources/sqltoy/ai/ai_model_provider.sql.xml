@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<sqltoy xmlns="http://www.sagframe.com/schema/sqltoy"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.sagframe.com/schema/sqltoy http://www.sagframe.com/schema/sqltoy/sqltoy.xsd">
+
+    <sql id="ai_model_provider_findList">
+        <value>
+            <![CDATA[
+            select id, provider_name, provider_type, api_base_url, api_key, sort, enable_status, remark, create_by, create_time, update_by, update_time, is_deleted, revision
+            from ai_model_provider
+            where is_deleted=0
+            #[and enable_status = :enableStatus]
+            #[and provider_name like :providerName]
+            #[and provider_type like :providerType]
+            order by sort desc, id desc
+            ]]>
+        </value>
+    </sql>
+
+</sqltoy>

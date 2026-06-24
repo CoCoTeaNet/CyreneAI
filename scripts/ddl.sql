@@ -124,3 +124,49 @@ CREATE TABLE `sys_user_role` (
   `role_id` bigint(20) NOT NULL COMMENT '角色id',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC COMMENT='用户角色关联表';
+
+
+-- cyrene_ai.ai_model_provider definition
+
+CREATE TABLE `ai_model_provider` (
+  `id` bigint(20) NOT NULL COMMENT '提供商id',
+  `provider_name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '提供商名称',
+  `provider_type` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '提供商类型;openai, anthropic, dashscope, ollama 等',
+  `api_base_url` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'API 地址',
+  `api_key` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'API 密钥',
+  `sort` int(11) DEFAULT '0' COMMENT '排序号',
+  `enable_status` tinyint(4) DEFAULT '1' COMMENT '启用状态;0关闭 1启用',
+  `remark` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '备注',
+  `create_by` bigint(20) NOT NULL COMMENT '创建人',
+  `create_time` datetime NOT NULL COMMENT '创建时间',
+  `update_by` bigint(20) DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime DEFAULT NULL COMMENT '更新时间',
+  `is_deleted` tinyint(4) NOT NULL DEFAULT '0' COMMENT '是否删除',
+  `revision` int(11) DEFAULT NULL COMMENT '乐观锁',
+  PRIMARY KEY (`id`),
+  KEY `ai_model_provider_type_index` (`provider_type`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC COMMENT='AI 模型提供商表';
+
+
+-- cyrene_ai.ai_model definition
+
+CREATE TABLE `ai_model` (
+  `id` bigint(20) NOT NULL COMMENT '模型id',
+  `provider_id` bigint(20) NOT NULL COMMENT '提供商id',
+  `model_name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '模型名称',
+  `context_window` int(11) DEFAULT NULL COMMENT '上下文窗口大小',
+  `input_price` decimal(10,4) DEFAULT NULL COMMENT '输入价格(每千token)',
+  `output_price` decimal(10,4) DEFAULT NULL COMMENT '输出价格(每千token)',
+  `is_default` tinyint(4) DEFAULT '0' COMMENT '是否默认;0否 1是',
+  `sort` int(11) DEFAULT '0' COMMENT '排序号',
+  `enable_status` tinyint(4) DEFAULT '1' COMMENT '启用状态;0关闭 1启用',
+  `remark` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '备注',
+  `create_by` bigint(20) NOT NULL COMMENT '创建人',
+  `create_time` datetime NOT NULL COMMENT '创建时间',
+  `update_by` bigint(20) DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime DEFAULT NULL COMMENT '更新时间',
+  `is_deleted` tinyint(4) NOT NULL DEFAULT '0' COMMENT '是否删除',
+  `revision` int(11) DEFAULT NULL COMMENT '乐观锁',
+  PRIMARY KEY (`id`),
+  KEY `ai_model_provider_id_index` (`provider_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC COMMENT='AI 模型表';

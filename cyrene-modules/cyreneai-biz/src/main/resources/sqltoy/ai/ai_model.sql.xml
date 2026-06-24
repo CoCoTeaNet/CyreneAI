@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<sqltoy xmlns="http://www.sagframe.com/schema/sqltoy"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.sagframe.com/schema/sqltoy http://www.sagframe.com/schema/sqltoy/sqltoy.xsd">
+
+    <sql id="ai_model_findList">
+        <value>
+            <![CDATA[
+            select m.id, m.provider_id, m.model_name, m.context_window, m.input_price, m.output_price,
+                   m.is_default, m.sort, m.enable_status, m.remark,
+                   m.create_by, m.create_time, m.update_by, m.update_time, m.is_deleted, m.revision,
+                   p.provider_name as provider_name
+            from ai_model m
+            left join ai_model_provider p on p.id = m.provider_id
+            where m.is_deleted=0
+            #[and m.provider_id = :providerId]
+            #[and m.enable_status = :enableStatus]
+            #[and m.model_name like :modelName]
+            order by m.sort desc, m.id desc
+            ]]>
+        </value>
+    </sql>
+
+</sqltoy>

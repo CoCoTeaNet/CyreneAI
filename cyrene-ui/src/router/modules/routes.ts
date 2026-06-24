@@ -10,6 +10,8 @@ const NotFound = () => import("@/views/error/NotFound.vue");
 const UserCenterView = () => import("@/views/system/personal/UserCenterView.vue");
 const OperationLogView = () => import("@/views/system/manager/system/log/SysLogView.vue");
 const Login = () => import("@/views/system/login/Login.vue");
+const AiModelProviderView = () => import("@/views/ai/model-provider/index.vue");
+const AiModelView = () => import("@/views/ai/model/index.vue");
 
 
 export const routes = [
@@ -37,6 +39,9 @@ export const routes = [
             {path: 'sys-dictionary-manager', meta: {title: '字典管理'}, name: 'DictionaryView', component: DictionaryView},
             {path: 'sys-log-manager', meta: {title: '日志管理'}, name: 'OperationLogView', component: OperationLogView},
             {path: 'sys-user-center', meta: {title: '用户中心'}, name: 'UserCenterView', component: UserCenterView},
+            // AI 模块
+            {path: 'ai-model-provider', meta: {title: '模型提供商'}, name: 'AiModelProviderView', component: AiModelProviderView},
+            {path: 'ai-model', meta: {title: '模型管理'}, name: 'AiModelView', component: AiModelView},
         ]
     },
     {

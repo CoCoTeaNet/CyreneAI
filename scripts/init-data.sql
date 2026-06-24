@@ -43,13 +43,46 @@ INSERT INTO sys_user (id,username,nickname,password,sex,email,mobile_phone,accou
                                                                                                                                                                                                                  (1699771308310499328,'admin','admin@cocotea','BD4D0EFF684A1787AF155BF6D1980D1FAB92B5581F9CBA0634890E33AE531328',0,'caadmin@qq.com','13899998888',1,'650c74c32088821487c0b4d8_微信图片_20230921232652.png','0:0:0:0:0:0:0:1','2025-12-14 14:52:33',1699771308310499328,'2023-09-07 21:07:55',1699771308310499328,'2025-12-14 15:18:11',0,NULL),
                                                                                                                                                                                                                  (1449777875075072000,'tester','tester','admin#123456',2,'tester@qq.com',NULL,1,NULL,NULL,NULL,1699771308310499328,'2025-12-14 14:59:41',1699771308310499328,'2025-12-14 14:59:41',0,NULL);
 INSERT INTO sys_user_role (id,user_id,role_id) VALUES
-                                                                (1449781848104370176,1699771308310499328,1255197419386601472),
-                                                                (1449781848016289792,1699771308310499328,1699771910151151616),
-                                                                (1262416640579371008,1262416640516456448,1150175648716701696),
-                                                                (1255529577607233536,1255193297551785984,1150175648716701696),
-                                                                (1255207984641245184,1255193297551786000,1150175648716701696),
-                                                                (1255523337372073984,1255523337351102464,1150175648716701696),
-                                                                (1262415845557436416,1262415845528076288,1150175648716701696),
-                                                                (1449777875226066944,1449777875075072000,1255197419386601472),
-                                                                (1449777875272204288,1449777875075072000,1150175648716701696),
-                                                                (1449781848200839168,1699771308310499328,1150175648716701696);
+                                                                 (1449781848104370176,1699771308310499328,1255197419386601472),
+                                                                 (1449781848016289792,1699771308310499328,1699771910151151616),
+                                                                 (1262416640579371008,1262416640516456448,1150175648716701696),
+                                                                 (1255529577607233536,1255193297551785984,1150175648716701696),
+                                                                 (1255207984641245184,1255193297551786000,1150175648716701696),
+                                                                 (1255523337372073984,1255523337351102464,1150175648716701696),
+                                                                 (1262415845557436416,1262415845528076288,1150175648716701696),
+                                                                 (1449777875226066944,1449777875075072000,1255197419386601472),
+                                                                 (1449777875272204288,1449777875075072000,1150175648716701696),
+                                                                 (1449781848200839168,1699771308310499328,1150175648716701696);
+
+-- AI model provider initial data
+INSERT INTO ai_model_provider (id, provider_name, provider_type, api_base_url, api_key, sort, enable_status, remark, create_by, create_time, update_by, update_time, is_deleted, revision) VALUES
+(1810000000000000001, 'DashScope', 'dashscope', 'https://dashscope.aliyuncs.com/api/v1', '', 1, 1, 'Aliyun DashScope official API', 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL);
+
+-- AI model initial data
+INSERT INTO ai_model (id, provider_id, model_name, context_window, input_price, output_price, is_default, sort, enable_status, remark, create_by, create_time, update_by, update_time, is_deleted, revision) VALUES
+(1810000000000001001, 1810000000000000001, 'qwen-turbo', 131072, 0.0003, 0.0006, 0, 1, 1, 'Qwen Turbo', 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL);
+
+INSERT INTO ai_model (id, provider_id, model_name, context_window, input_price, output_price, is_default, sort, enable_status, remark, create_by, create_time, update_by, update_time, is_deleted, revision) VALUES
+(1810000000000001002, 1810000000000000001, 'qwen-plus', 131072, 0.0004, 0.0012, 1, 2, 1, 'Qwen Plus', 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL);
+
+INSERT INTO ai_model (id, provider_id, model_name, context_window, input_price, output_price, is_default, sort, enable_status, remark, create_by, create_time, update_by, update_time, is_deleted, revision) VALUES
+(1810000000000001003, 1810000000000000001, 'qwen-max', 131072, 0.002, 0.006, 0, 3, 1, 'Qwen Max', 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL);
+
+INSERT INTO ai_model (id, provider_id, model_name, context_window, input_price, output_price, is_default, sort, enable_status, remark, create_by, create_time, update_by, update_time, is_deleted, revision) VALUES
+(1810000000000001004, 1810000000000000001, 'qwen3.7-plus', 131072, 0.005, 0.02, 0, 4, 1, 'Qwen3.7 Plus', 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL);
+
+-- AI module menus
+INSERT INTO sys_menu (id, menu_name, permission_code, router_path, parent_id, menu_type, is_menu, menu_status, component_path, is_external_link, icon_path, sort, create_by, create_time, update_by, update_time, is_deleted, revision) VALUES
+(1810000000000002000, 'AI Management', ':ai', '/ai', 0, 0, 1, 0, '', 0, 'Cpu', 5, 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL);
+
+INSERT INTO sys_menu (id, menu_name, permission_code, router_path, parent_id, menu_type, is_menu, menu_status, component_path, is_external_link, icon_path, sort, create_by, create_time, update_by, update_time, is_deleted, revision) VALUES
+(1810000000000002001, 'Model Provider', ':ai:model-provider', '/admin/ai-model-provider', 1810000000000002000, 1, 1, 0, '', 0, 'List', 1, 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL);
+
+INSERT INTO sys_menu (id, menu_name, permission_code, router_path, parent_id, menu_type, is_menu, menu_status, component_path, is_external_link, icon_path, sort, create_by, create_time, update_by, update_time, is_deleted, revision) VALUES
+(1810000000000002002, 'Model Management', ':ai:model', '/admin/ai-model', 1810000000000002000, 1, 1, 0, '', 0, 'Setting', 2, 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL);
+
+-- Assign AI menus to Super Administrator role
+INSERT INTO sys_role_menu (id, role_id, menu_id) VALUES
+(1810000000000002003, 1699771910151151616, 1810000000000002000),
+(1810000000000002004, 1699771910151151616, 1810000000000002001),
+(1810000000000002005, 1699771910151151616, 1810000000000002002);
