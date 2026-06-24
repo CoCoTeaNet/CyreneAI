@@ -12,6 +12,7 @@ const OperationLogView = () => import("@/views/system/manager/system/log/SysLogV
 const Login = () => import("@/views/system/login/Login.vue");
 const AiModelProviderView = () => import("@/views/ai/model-provider/index.vue");
 const AiModelView = () => import("@/views/ai/model/index.vue");
+const AiChatView = () => import("@/views/ai/chat/index.vue");
 
 
 export const routes = [
@@ -40,6 +41,7 @@ export const routes = [
             {path: 'sys-log-manager', meta: {title: '日志管理'}, name: 'OperationLogView', component: OperationLogView},
             {path: 'sys-user-center', meta: {title: '用户中心'}, name: 'UserCenterView', component: UserCenterView},
             // AI 模块
+            {path: 'ai-chat', meta: {title: 'AI Chat'}, name: 'AiChatView', component: AiChatView},
             {path: 'ai-model-provider', meta: {title: '模型提供商'}, name: 'AiModelProviderView', component: AiModelProviderView},
             {path: 'ai-model', meta: {title: '模型管理'}, name: 'AiModelView', component: AiModelView},
         ]

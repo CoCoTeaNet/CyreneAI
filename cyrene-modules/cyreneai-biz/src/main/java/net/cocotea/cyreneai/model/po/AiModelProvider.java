@@ -6,6 +6,7 @@ import org.sagacity.sqltoy.config.annotation.Column;
 import org.sagacity.sqltoy.config.annotation.Entity;
 import org.sagacity.sqltoy.config.annotation.Id;
 
+import java.io.Serial;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.time.LocalDateTime;
@@ -15,6 +16,7 @@ import java.time.LocalDateTime;
 @Entity(tableName = "ai_model_provider", comment = "AI模型提供商表", pk_constraint = "PRIMARY")
 public class AiModelProvider implements Serializable {
 
+    @Serial
     private static final long serialVersionUID = 1L;
 
     @Id(strategy = "generator", generator = "org.sagacity.sqltoy.plugins.id.impl.SnowflakeIdGenerator")

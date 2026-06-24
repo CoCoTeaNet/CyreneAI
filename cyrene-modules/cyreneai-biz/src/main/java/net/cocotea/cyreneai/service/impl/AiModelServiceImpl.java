@@ -1,7 +1,6 @@
 package net.cocotea.cyreneai.service.impl;
 
 import cn.hutool.core.map.MapUtil;
-import lombok.RequiredArgsConstructor;
 import net.cocotea.cyreneadmin.model.ApiPage;
 import net.cocotea.cyreneai.model.dto.AiModelAddDTO;
 import net.cocotea.cyreneai.model.dto.AiModelPageDTO;
@@ -9,17 +8,20 @@ import net.cocotea.cyreneai.model.dto.AiModelUpdateDTO;
 import net.cocotea.cyreneai.model.po.AiModel;
 import net.cocotea.cyreneai.model.vo.AiModelVO;
 import net.cocotea.cyreneai.service.AiModelService;
+import org.noear.solon.annotation.Component;
 import org.sagacity.sqltoy.dao.LightDao;
 import org.sagacity.sqltoy.model.Page;
+import org.sagacity.sqltoy.solon.annotation.Db;
 
 import java.math.BigInteger;
 import java.util.List;
 import java.util.Map;
 
-@RequiredArgsConstructor
+@Component
 public class AiModelServiceImpl implements AiModelService {
 
-    private final LightDao lightDao;
+    @Db
+    private LightDao lightDao;
 
     @Override
     public boolean add(AiModelAddDTO param) {
@@ -68,5 +70,12 @@ public class AiModelServiceImpl implements AiModelService {
         AiModel model = new AiModel().setId(id).setIsDeleted(1);
         Long update = lightDao.update(model);
         return update != null && update > 0;
+    }
+
+    @Override
+    public List<AiModelVO> listEnabled() {
+        Map<String, Object> map = MapUtil.newHashMap(1);
+        map.put("enableStatus", 1);
+        return lightDao.find("ai_model_findList", map, AiModelVO.class);
     }
 }

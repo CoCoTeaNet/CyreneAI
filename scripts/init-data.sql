@@ -81,8 +81,12 @@ INSERT INTO sys_menu (id, menu_name, permission_code, router_path, parent_id, me
 INSERT INTO sys_menu (id, menu_name, permission_code, router_path, parent_id, menu_type, is_menu, menu_status, component_path, is_external_link, icon_path, sort, create_by, create_time, update_by, update_time, is_deleted, revision) VALUES
 (1810000000000002002, 'Model Management', ':ai:model', '/admin/ai-model', 1810000000000002000, 1, 1, 0, '', 0, 'Setting', 2, 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL);
 
+INSERT INTO sys_menu (id, menu_name, permission_code, router_path, parent_id, menu_type, is_menu, menu_status, component_path, is_external_link, icon_path, sort, create_by, create_time, update_by, update_time, is_deleted, revision) VALUES
+(1810000000000002003, 'AI Chat', ':ai:chat', '/admin/ai-chat', 1810000000000002000, 1, 1, 0, '', 0, 'ChatDotSquare', 3, 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL);
+
 -- Assign AI menus to Super Administrator role
 INSERT INTO sys_role_menu (id, role_id, menu_id) VALUES
-(1810000000000002003, 1699771910151151616, 1810000000000002000),
-(1810000000000002004, 1699771910151151616, 1810000000000002001),
-(1810000000000002005, 1699771910151151616, 1810000000000002002);
+(1810000000000002004, 1699771910151151616, 1810000000000002000),
+(1810000000000002005, 1699771910151151616, 1810000000000002001),
+(1810000000000002006, 1699771910151151616, 1810000000000002002),
+(1810000000000002007, 1699771910151151616, 1810000000000002003);

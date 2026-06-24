@@ -7,10 +7,14 @@ import net.cocotea.cyreneai.model.dto.AiModelPageDTO;
 import net.cocotea.cyreneai.model.dto.AiModelUpdateDTO;
 import net.cocotea.cyreneai.model.vo.AiModelVO;
 
+import java.util.List;
+
 public interface AiModelService extends BaseService<
         ApiPage<AiModelVO>,
         AiModelPageDTO,
         AiModelAddDTO,
         AiModelUpdateDTO
         > {
+
+    List<AiModelVO> listEnabled();
 }

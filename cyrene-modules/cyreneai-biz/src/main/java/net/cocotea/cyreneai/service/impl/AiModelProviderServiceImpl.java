@@ -1,7 +1,6 @@
 package net.cocotea.cyreneai.service.impl;
 
 import cn.hutool.core.map.MapUtil;
-import lombok.RequiredArgsConstructor;
 import net.cocotea.cyreneadmin.model.ApiPage;
 import net.cocotea.cyreneai.model.dto.AiModelProviderAddDTO;
 import net.cocotea.cyreneai.model.dto.AiModelProviderPageDTO;
@@ -9,17 +8,20 @@ import net.cocotea.cyreneai.model.dto.AiModelProviderUpdateDTO;
 import net.cocotea.cyreneai.model.po.AiModelProvider;
 import net.cocotea.cyreneai.model.vo.AiModelProviderVO;
 import net.cocotea.cyreneai.service.AiModelProviderService;
+import org.noear.solon.annotation.Component;
 import org.sagacity.sqltoy.dao.LightDao;
 import org.sagacity.sqltoy.model.Page;
+import org.sagacity.sqltoy.solon.annotation.Db;
 
 import java.math.BigInteger;
 import java.util.List;
 import java.util.Map;
 
-@RequiredArgsConstructor
+@Component
 public class AiModelProviderServiceImpl implements AiModelProviderService {
 
-    private final LightDao lightDao;
+    @Db
+    private LightDao lightDao;
 
     @Override
     public boolean add(AiModelProviderAddDTO param) {
