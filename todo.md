@@ -75,36 +75,36 @@
 ## 📚 Phase 3 — RAG / 知识库
 
 ### 3.1 向量数据库接入
-- [ ] 引入向量数据库依赖（pgvector / Milvus / Chroma）
-- [ ] 配置向量数据库连接
-- [ ] 向量存取基础 Service 封装（`VectorStore`）
+- [x] 引入向量数据库依赖（pgvector / Milvus / Chroma） ✔
+- [x] 配置向量数据库连接 ✔
+- [x] 向量存取基础 Service 封装（`VectorStore`） ✔
 
 ### 3.2 Embedding 模型接入
-- [ ] 支持 DashScope 文本嵌入（`TextEmbeddingModel`）
+- [x] 支持 DashScope 文本嵌入（`TextEmbeddingModel`） ✔
 - [ ] 支持 OpenAI Embedding
-- [ ] `ai_embedding_model` 表管理嵌入模型配置
+- [x] `ai_embedding_model` 表管理嵌入模型配置 ✔
 - [ ] Embedding API 端点 `POST /ai/embeddings`
 
 ### 3.3 文档管理
-- [ ] `ai_document` 表：id, name, type(pdf/docx/txt/md), size, status, chunk_count
-- [ ] 文件上传接口（支持 PDF / DOCX / TXT / MD）
-- [ ] 文档解析服务（文本提取）
-- [ ] 文档分块策略配置（按大小 / 按段落 / 递归分割）
-- [ ] 分块入库（生成 Embedding 并存入向量库）
-- [ ] 前端文档管理页面（上传、列表、删除、重新索引）
+- [x] `ai_document` 表：id, name, type(pdf/docx/txt/md), size, status, chunk_count ✔
+- [x] 文件上传接口（支持 PDF / DOCX / TXT / MD） ✔
+- [x] 文档解析服务（文本提取） ✔
+- [x] 文档分块策略配置（按大小 / 按段落 / 递归分割） ✔
+- [x] 分块入库（生成 Embedding 并存入向量库） ✔
+- [x] 前端文档管理页面（上传、列表、删除、重新索引） ✔
 
 ### 3.4 知识库 QA
-- [ ] `ai_knowledge_base` 表：id, name, description, model_id, chunk_size, overlap
-- [ ] 知识库与文档关联（多对多）
-- [ ] 检索策略（相似度 top-k、MMR、混合检索）
+- [x] `ai_knowledge_base` 表：id, name, description, model_id, chunk_size, overlap ✔
+- [x] 知识库与文档关联（多对多） ✔
+- [x] 检索策略（相似度 top-k、MMR、混合检索） ✔
 - [ ] Rerank 重排序接入
 - [ ] 引用来源展示（前端显示匹配的文档片段）
-- [ ] Chat 时自动检索知识库并注入上下文
+- [x] Chat 时自动检索知识库并注入上下文 ✔
 
 ### 3.5 Web 爬取
-- [ ] URL 内容抓取（JSOUP / web 爬虫）
-- [ ] 网页内容清洗（去除导航、广告）
-- [ ] 网页转文档入库
+- [x] URL 内容抓取（JSOUP / web 爬虫） ✔
+- [x] 网页内容清洗（去除导航、广告） ✔
+- [x] 网页转文档入库 ✔
 
 ---
 
