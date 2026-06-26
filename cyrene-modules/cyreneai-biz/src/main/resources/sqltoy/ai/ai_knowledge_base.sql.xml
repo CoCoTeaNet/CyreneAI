@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<sqltoy xmlns="http://www.sagframe.com/schema/sqltoy"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.sagframe.com/schema/sqltoy http://www.sagframe.com/schema/sqltoy/sqltoy.xsd">
+
+    <sql id="ai_knowledge_base_findList">
+        <value>
+            <![CDATA[
+            select kb.id, kb.name, kb.description, kb.model_id, kb.embedding_model_id,
+                   kb.chunk_size, kb.chunk_overlap, kb.chunk_strategy,
+                   kb.retrieval_strategy, kb.top_k, kb.similarity_threshold, kb.enable_status,
+                   kb.create_by, kb.create_time, kb.update_by, kb.update_time, kb.is_deleted, kb.revision,
+                   m.model_name as model_name,
+                   em.model_name as embedding_model_name,
+                   (select count(*) from ai_kb_document kd where kd.kb_id = kb.id) as document_count
+            from ai_knowledge_base kb
+            left join ai_model m on m.id = kb.model_id
+            left join ai_embedding_model em on em.id = kb.embedding_model_id
+            where kb.is_deleted=0
+            #[and kb.name like :name]
+            #[and kb.enable_status = :enableStatus]
+            order by kb.create_time desc
+            ]]>
+        </value>
+    </sql>
+
+</sqltoy>

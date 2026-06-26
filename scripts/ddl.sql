@@ -201,3 +201,90 @@ CREATE TABLE IF NOT EXISTS `ai_message` (
     INDEX `idx_conversation_id` (`conversation_id`),
     INDEX `idx_created_time` (`created_time`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='AI消息表';
+
+-- 嵌入模型配置表
+CREATE TABLE IF NOT EXISTS `ai_embedding_model` (
+    `id` BIGINT NOT NULL COMMENT '主键ID',
+    `provider_type` VARCHAR(50) NOT NULL COMMENT '提供商类型;dashscope, openai',
+    `model_name` VARCHAR(100) NOT NULL COMMENT '模型名称;如 text-embedding-v3, text-embedding-3-small',
+    `api_key` VARCHAR(512) DEFAULT NULL COMMENT 'API密钥',
+    `api_base_url` VARCHAR(255) DEFAULT NULL COMMENT 'API地址',
+    `dimension` INT DEFAULT 1024 COMMENT '向量维度',
+    `is_default` TINYINT DEFAULT 0 COMMENT '是否默认;0否 1是',
+    `enable_status` TINYINT DEFAULT 1 COMMENT '启用状态;0关闭 1启用',
+    `sort` INT DEFAULT 0 COMMENT '排序号',
+    `remark` VARCHAR(255) DEFAULT NULL COMMENT '备注',
+    `create_by` BIGINT NOT NULL COMMENT '创建人',
+    `create_time` DATETIME NOT NULL COMMENT '创建时间',
+    `update_by` BIGINT DEFAULT NULL COMMENT '更新人',
+    `update_time` DATETIME DEFAULT NULL COMMENT '更新时间',
+    `is_deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除',
+    `revision` INT DEFAULT NULL COMMENT '乐观锁',
+    PRIMARY KEY (`id`),
+    INDEX `idx_provider_type` (`provider_type`),
+    INDEX `idx_is_default` (`is_default`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='嵌入模型配置表';
+
+-- 文档表
+CREATE TABLE IF NOT EXISTS `ai_document` (
+    `id` BIGINT NOT NULL COMMENT '主键ID',
+    `name` VARCHAR(255) NOT NULL COMMENT '文档名称',
+    `type` VARCHAR(20) NOT NULL COMMENT '文档类型;pdf, docx, txt, md',
+    `size` BIGINT DEFAULT 0 COMMENT '文件大小(字节)',
+    `file_path` VARCHAR(512) DEFAULT NULL COMMENT '文件存储路径',
+    `status` TINYINT DEFAULT 0 COMMENT '处理状态;0待处理 1处理中 2已完成 3失败',
+    `chunk_count` INT DEFAULT 0 COMMENT '分块数量',
+    `chunk_strategy` VARCHAR(50) DEFAULT 'paragraph' COMMENT '分块策略;size, paragraph, recursive',
+    `chunk_size` INT DEFAULT 500 COMMENT '分块大小',
+    `chunk_overlap` INT DEFAULT 50 COMMENT '分块重叠',
+    `error_msg` TEXT DEFAULT NULL COMMENT '错误信息',
+    `kb_id` BIGINT DEFAULT NULL COMMENT '所属知识库ID',
+    `create_by` BIGINT NOT NULL COMMENT '创建人',
+    `create_time` DATETIME NOT NULL COMMENT '创建时间',
+    `update_by` BIGINT DEFAULT NULL COMMENT '更新人',
+    `update_time` DATETIME DEFAULT NULL COMMENT '更新时间',
+    `is_deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除',
+    `revision` INT DEFAULT NULL COMMENT '乐观锁',
+    PRIMARY KEY (`id`),
+    INDEX `idx_kb_id` (`kb_id`),
+    INDEX `idx_status` (`status`),
+    INDEX `idx_type` (`type`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='文档表';
+
+-- ai_document_chunk 已迁移至 PostgreSQL (pgvector)，详见 scripts/ddl-pgvector.sql
+
+-- 知识库表
+CREATE TABLE IF NOT EXISTS `ai_knowledge_base` (
+    `id` BIGINT NOT NULL COMMENT '主键ID',
+    `name` VARCHAR(200) NOT NULL COMMENT '知识库名称',
+    `description` TEXT DEFAULT NULL COMMENT '知识库描述',
+    `model_id` BIGINT DEFAULT NULL COMMENT '关联模型ID(用于RAG回答)',
+    `embedding_model_id` BIGINT DEFAULT NULL COMMENT '嵌入模型ID',
+    `chunk_size` INT DEFAULT 500 COMMENT '默认分块大小',
+    `chunk_overlap` INT DEFAULT 50 COMMENT '默认分块重叠',
+    `chunk_strategy` VARCHAR(50) DEFAULT 'paragraph' COMMENT '默认分块策略',
+    `retrieval_strategy` VARCHAR(50) DEFAULT 'top_k' COMMENT '检索策略;top_k, mmr, hybrid',
+    `top_k` INT DEFAULT 5 COMMENT '检索返回条数',
+    `similarity_threshold` DECIMAL(5,4) DEFAULT 0.7 COMMENT '相似度阈值',
+    `enable_status` TINYINT DEFAULT 1 COMMENT '启用状态;0关闭 1启用',
+    `create_by` BIGINT NOT NULL COMMENT '创建人',
+    `create_time` DATETIME NOT NULL COMMENT '创建时间',
+    `update_by` BIGINT DEFAULT NULL COMMENT '更新人',
+    `update_time` DATETIME DEFAULT NULL COMMENT '更新时间',
+    `is_deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除',
+    `revision` INT DEFAULT NULL COMMENT '乐观锁',
+    PRIMARY KEY (`id`),
+    INDEX `idx_enable_status` (`enable_status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='知识库表';
+
+-- 知识库文档关联表
+CREATE TABLE IF NOT EXISTS `ai_kb_document` (
+    `id` BIGINT NOT NULL COMMENT '主键ID',
+    `kb_id` BIGINT NOT NULL COMMENT '知识库ID',
+    `document_id` BIGINT NOT NULL COMMENT '文档ID',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_kb_doc` (`kb_id`, `document_id`),
+    INDEX `idx_kb_id` (`kb_id`),
+    INDEX `idx_document_id` (`document_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='知识库文档关联表';

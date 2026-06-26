@@ -53,6 +53,12 @@ myapp:
     support-filetype: pdf,doc,docx,ppt,txt,md,xlsx,xlx,jpg,png
     # 媒体格式
     media-filetype: mp4,avi,mpg,mpeg,wmv,flv,swf,mov,mkv
+  # PostgreSQL (向量存储)
+  db2:
+    jdbcUrl: jdbc:postgresql://127.0.0.1:5432/cyrene_ai?currentSchema=public
+    driverClassName: org.postgresql.Driver
+    username: root
+    password: 123456
   # MySQL
   db1:
     schema: cyrene_admin

@@ -21,6 +21,7 @@ export interface ChatParams {
     maxTokens?: number;
     systemPrompt?: string;
     contextStrategy?: string;
+    kbId?: string | null;
 }
 
 export function useChatStream() {
@@ -84,6 +85,7 @@ export function useChatStream() {
             if (params.maxTokens !== undefined) body.maxTokens = params.maxTokens;
             if (params.systemPrompt) body.systemPrompt = params.systemPrompt;
             if (params.contextStrategy) body.contextStrategy = params.contextStrategy;
+            if (params.kbId) body.kbId = params.kbId;
         }
 
         try {

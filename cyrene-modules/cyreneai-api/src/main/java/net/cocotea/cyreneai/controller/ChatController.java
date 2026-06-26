@@ -26,7 +26,9 @@ import net.cocotea.cyreneai.model.dto.ChatRequestDTO.ChatMessageDTO;
 import net.cocotea.cyreneai.model.po.AiConversation;
 import net.cocotea.cyreneai.model.po.AiModel;
 import net.cocotea.cyreneai.model.po.AiModelProvider;
+import net.cocotea.cyreneai.model.vo.AiRetrievalResultVO;
 import net.cocotea.cyreneai.service.AiConversationService;
+import net.cocotea.cyreneai.service.rag.KnowledgeBaseService;
 import org.noear.solon.annotation.Body;
 import org.noear.solon.annotation.Controller;
 import org.noear.solon.annotation.Get;
@@ -60,6 +62,9 @@ public class ChatController {
 
     @Inject
     private AiConversationService conversationService;
+
+    @Inject
+    private KnowledgeBaseService knowledgeBaseService;
 
     @Get @Mapping("/ping")
     public String ping() {
@@ -108,7 +113,7 @@ public class ChatController {
                 return;
             }
 
-            List<ChatMessage> messages = convertMessages(request.getMessages(), request.getSystemPrompt());
+            List<ChatMessage> messages = convertMessages(request.getMessages(), request.getSystemPrompt(), request.getKbId());
             messages = compressMessages(messages, aiModel, request);
             model.chat(messages, new StreamingChatResponseHandler() {
                 @Override
@@ -357,8 +362,42 @@ public class ChatController {
         };
     }
 
-    private List<ChatMessage> convertMessages(List<ChatMessageDTO> dtos, String systemPrompt) {
+    private List<ChatMessage> convertMessages(List<ChatMessageDTO> dtos, String systemPrompt, BigInteger kbId) {
         List<ChatMessage> messages = new ArrayList<>();
+
+        // Inject knowledge base context as system prompt
+        if (kbId != null && dtos != null && !dtos.isEmpty()) {
+            try {
+                String lastUserQuery = null;
+                for (int i = dtos.size() - 1; i >= 0; i--) {
+                    if ("user".equals(dtos.get(i).getRole())) {
+                        lastUserQuery = dtos.get(i).getContent();
+                        break;
+                    }
+                }
+                if (lastUserQuery != null) {
+                    List<AiRetrievalResultVO> relevantDocs = knowledgeBaseService.retrieve(kbId, lastUserQuery, 5, 0.7, "top_k");
+                    if (!relevantDocs.isEmpty()) {
+                        StringBuilder ragContext = new StringBuilder();
+                        ragContext.append("以下是来自知识库的相关参考信息，请基于这些信息回答用户问题。\n\n");
+                        for (int i = 0; i < relevantDocs.size(); i++) {
+                            AiRetrievalResultVO doc = relevantDocs.get(i);
+                            ragContext.append("[").append(i + 1).append("] ");
+                            if (doc.getDocumentName() != null) {
+                                ragContext.append("(来源: ").append(doc.getDocumentName()).append(") ");
+                            }
+                            ragContext.append(doc.getContent()).append("\n\n");
+                        }
+                        ragContext.append("请基于上述参考信息回答用户的问题。如果参考信息不足以回答问题，请说明。");
+                        messages.add(new SystemMessage(ragContext.toString()));
+                        log.info("Injected {} RAG context chunks for kbId={}", relevantDocs.size(), kbId);
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Failed to inject RAG context", e);
+            }
+        }
+
         if (systemPrompt != null && !systemPrompt.isBlank()) {
             messages.add(new SystemMessage(systemPrompt));
         }

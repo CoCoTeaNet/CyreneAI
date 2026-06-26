@@ -15,6 +15,7 @@ export const get = 'GET';
  * @param method 请求方法
  */
 export async function request(url: string, data: any, method: any): Promise<any> {
+    let isFormData = data instanceof FormData;
     let config :any = {
         // `url` 是用于请求的服务器 URL
         url: `/api/${url}`,
@@ -22,7 +23,7 @@ export async function request(url: string, data: any, method: any): Promise<any>
         method: method,
         // `transformRequest` 允许在向服务器发送前，修改请求数据
         transformRequest: [function (data: any) {
-            // 对 data 进行任意转换处理
+            if (data instanceof FormData) return data;
             return JSON.stringify(data);
         }],
         // `transformResponse` 在传递给 then/catch 前，允许修改响应数据
@@ -36,7 +37,7 @@ export async function request(url: string, data: any, method: any): Promise<any>
             return dataJson;
         }],
         // `headers` 是即将被发送的自定义请求头
-        headers: {
+        headers: isFormData ? {} : {
             "X-Requested-With": "XMLHttpRequest",
             "Content-Type": 'application/json;charset=utf-8'
         },

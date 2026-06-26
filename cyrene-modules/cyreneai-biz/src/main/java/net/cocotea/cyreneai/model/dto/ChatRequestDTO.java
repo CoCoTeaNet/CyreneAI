@@ -27,6 +27,9 @@ public class ChatRequestDTO implements Serializable {
     /** Context window strategy: "truncate" (default) or "summarize" */
     private String contextStrategy;
 
+    /** Knowledge base ID for RAG context injection */
+    private BigInteger kbId;
+
     private Double temperature;
 
     private Double topP;

@@ -13,6 +13,9 @@ const Login = () => import("@/views/system/login/Login.vue");
 const AiModelProviderView = () => import("@/views/ai/model-provider/index.vue");
 const AiModelView = () => import("@/views/ai/model/index.vue");
 const AiChatView = () => import("@/views/ai/chat/index.vue");
+const AiDocumentView = () => import("@/views/ai/document/index.vue");
+const AiKnowledgeBaseView = () => import("@/views/ai/knowledge-base/index.vue");
+const AiEmbeddingModelView = () => import("@/views/ai/embedding-model/index.vue");
 
 
 export const routes = [
@@ -44,6 +47,9 @@ export const routes = [
             {path: 'ai-chat', meta: {title: 'AI Chat'}, name: 'AiChatView', component: AiChatView},
             {path: 'ai-model-provider', meta: {title: '模型提供商'}, name: 'AiModelProviderView', component: AiModelProviderView},
             {path: 'ai-model', meta: {title: '模型管理'}, name: 'AiModelView', component: AiModelView},
+            {path: 'ai-document', meta: {title: '文档管理'}, name: 'AiDocumentView', component: AiDocumentView},
+            {path: 'ai-knowledge-base', meta: {title: '知识库'}, name: 'AiKnowledgeBaseView', component: AiKnowledgeBaseView},
+            {path: 'ai-embedding-model', meta: {title: '嵌入模型'}, name: 'AiEmbeddingModelView', component: AiEmbeddingModelView},
         ]
     },
     {

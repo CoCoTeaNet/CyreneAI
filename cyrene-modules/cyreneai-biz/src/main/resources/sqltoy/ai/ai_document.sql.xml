@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<sqltoy xmlns="http://www.sagframe.com/schema/sqltoy"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.sagframe.com/schema/sqltoy http://www.sagframe.com/schema/sqltoy/sqltoy.xsd">
+
+    <sql id="ai_document_findList">
+        <value>
+            <![CDATA[
+            select d.id, d.name, d.type, d.size, d.file_path, d.status,
+                   d.chunk_count, d.chunk_strategy, d.chunk_size, d.chunk_overlap,
+                   d.error_msg, d.kb_id,
+                   d.create_by, d.create_time, d.update_by, d.update_time, d.is_deleted, d.revision,
+                   k.name as kb_name
+            from ai_document d
+            left join ai_knowledge_base k on k.id = d.kb_id
+            where d.is_deleted=0
+            #[and d.name like :name]
+            #[and d.type = :type]
+            #[and d.status = :status]
+            #[and d.kb_id = :kbId]
+            order by d.create_time desc
+            ]]>
+        </value>
+    </sql>
+
+</sqltoy>

@@ -84,9 +84,25 @@ INSERT INTO sys_menu (id, menu_name, permission_code, router_path, parent_id, me
 INSERT INTO sys_menu (id, menu_name, permission_code, router_path, parent_id, menu_type, is_menu, menu_status, component_path, is_external_link, icon_path, sort, create_by, create_time, update_by, update_time, is_deleted, revision) VALUES
 (1810000000000002003, 'AI Chat', ':ai:chat', '/admin/ai-chat', 1810000000000002000, 1, 1, 0, '', 0, 'ChatDotSquare', 3, 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL);
 
+INSERT INTO sys_menu (id, menu_name, permission_code, router_path, parent_id, menu_type, is_menu, menu_status, component_path, is_external_link, icon_path, sort, create_by, create_time, update_by, update_time, is_deleted, revision) VALUES
+(1810000000000002004, 'Document Management', ':ai:document', '/admin/ai-document', 1810000000000002000, 1, 1, 0, '', 0, 'Document', 4, 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL);
+
+INSERT INTO sys_menu (id, menu_name, permission_code, router_path, parent_id, menu_type, is_menu, menu_status, component_path, is_external_link, icon_path, sort, create_by, create_time, update_by, update_time, is_deleted, revision) VALUES
+(1810000000000002005, 'Knowledge Base', ':ai:knowledge-base', '/admin/ai-knowledge-base', 1810000000000002000, 1, 1, 0, '', 0, 'Collection', 5, 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL);
+
+-- AI embedding model initial data
+INSERT INTO ai_embedding_model (id, provider_type, model_name, api_key, api_base_url, dimension, is_default, enable_status, sort, remark, create_by, create_time, update_by, update_time, is_deleted, revision) VALUES
+(1810000000000003001, 'dashscope', 'text-embedding-v3', '', NULL, 1024, 1, 1, 1, 'DashScope text-embedding-v3 (default)', 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL);
+
+INSERT INTO sys_menu (id, menu_name, permission_code, router_path, parent_id, menu_type, is_menu, menu_status, component_path, is_external_link, icon_path, sort, create_by, create_time, update_by, update_time, is_deleted, revision) VALUES
+(1810000000000002006, 'Embedding Model', ':ai:embedding-model', '/admin/ai-embedding-model', 1810000000000002000, 1, 1, 0, '', 0, 'Connection', 6, 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL);
+
 -- Assign AI menus to Super Administrator role
 INSERT INTO sys_role_menu (id, role_id, menu_id) VALUES
-(1810000000000002004, 1699771910151151616, 1810000000000002000),
-(1810000000000002005, 1699771910151151616, 1810000000000002001),
-(1810000000000002006, 1699771910151151616, 1810000000000002002),
-(1810000000000002007, 1699771910151151616, 1810000000000002003);
+(1810000000000002006, 1699771910151151616, 1810000000000002000),
+(1810000000000002007, 1699771910151151616, 1810000000000002001),
+(1810000000000002008, 1699771910151151616, 1810000000000002002),
+(1810000000000002009, 1699771910151151616, 1810000000000002003),
+(1810000000000002010, 1699771910151151616, 1810000000000002004),
+(1810000000000002011, 1699771910151151616, 1810000000000002005),
+(1810000000000002020, 1699771910151151616, 1810000000000002006);

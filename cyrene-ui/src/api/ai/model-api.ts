@@ -1,4 +1,4 @@
-import {request, post} from '@/utils/axios-util';
+import {request, post, get} from '@/utils/axios-util';
 
 export function add(data: any) {
     return request('ai/model/add', data, post);
@@ -14,4 +14,8 @@ export function deleteBatch(data: any) {
 
 export function listByPage(data: any) {
     return request('ai/model/listByPage', data, post);
+}
+
+export function listEnabled() {
+    return request('ai/model/listEnabled', {}, get);
 }

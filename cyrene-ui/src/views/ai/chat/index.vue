@@ -92,6 +92,11 @@
                 <el-option label="Summarize" value="summarize" />
               </el-select>
             </el-form-item>
+            <el-form-item label="Knowledge Base">
+              <el-select v-model="chatParams.kbId" placeholder="Off" style="width: 200px" filterable clearable>
+                <el-option v-for="kb in kbList" :key="kb.id" :label="kb.name" :value="kb.id" />
+              </el-select>
+            </el-form-item>
           </el-form>
         </div>
       </el-collapse-transition>
@@ -177,6 +182,7 @@ import {Refresh, Setting, Plus, Delete, Download, Upload, Edit, Delete as Delete
 import {ElMessage, ElMessageBox} from 'element-plus';
 import {listEnabled} from '@/api/ai/chat-api';
 import {listConversations, createConversation, deleteConversation as apiDeleteConversation, getConversationMessages, exportConversation, importConversation, deleteMessage as apiDeleteMessage, clearMessages as apiClearMessages, shareConversation as apiShareConversation} from '@/api/ai/conversation-api';
+import {listEnabled as listKbEnabled} from '@/api/ai/knowledge-base-api';
 import {useChatStream, type ChatMessage, type ChatParams} from '@/composables/useChatStream';
 
 marked.setOptions({
@@ -196,12 +202,14 @@ const userInput = ref('');
 const messages = ref<ChatMessage[]>([]);
 const messageContainer = ref<HTMLElement | null>(null);
 const showParams = ref(false);
+const kbList = ref<any[]>([]);
 const chatParams = ref<ChatParams>({
   temperature: 0.7,
   topP: 0.9,
   maxTokens: 2048,
   systemPrompt: '',
-  contextStrategy: 'truncate'
+  contextStrategy: 'truncate',
+  kbId: null
 });
 const {streaming, sendMessage, stopStream} = useChatStream();
 
@@ -213,6 +221,7 @@ const editingIdx = ref(-1);
 onMounted(() => {
   loadModels();
   loadConversations();
+  loadKbList();
 });
 
 function loadModels() {
@@ -234,6 +243,12 @@ function loadConversations() {
   }).catch(() => {
     ElMessage.error('Failed to load conversations');
   });
+}
+
+function loadKbList() {
+  listKbEnabled().then((res: any) => {
+    kbList.value = res?.data || [];
+  }).catch(() => {});
 }
 
 async function newConversation() {

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<sqltoy xmlns="http://www.sagframe.com/schema/sqltoy"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.sagframe.com/schema/sqltoy http://www.sagframe.com/schema/sqltoy/sqltoy.xsd">
+
+    <sql id="ai_embedding_model_findList">
+        <value>
+            <![CDATA[
+            select id, provider_type, model_name, api_key, api_base_url, dimension,
+                   is_default, enable_status, sort, remark,
+                   create_by, create_time, update_by, update_time, is_deleted, revision
+            from ai_embedding_model
+            where is_deleted=0
+            #[and provider_type = :providerType]
+            #[and model_name like :modelName]
+            #[and enable_status = :enableStatus]
+            order by sort desc, id desc
+            ]]>
+        </value>
+    </sql>
+
+</sqltoy>
