@@ -21,18 +21,6 @@ CyreneAI/
 └── pom.xml                   # Maven 父工程
 ```
 
-## 开发规范
-
-**⚠️ 重要：业务代码只在 `cyrene-modules` 中开发，其它模块尽量不改动。**
-
-| 模块 | 说明 | 是否修改 |
-|------|------|----------|
-| `cyrene-modules` | AI 业务功能 | ✅ 主要开发区域 |
-| `cyrene-common` | 公共工具 | ⚠️ 谨慎修改 |
-| `cyrene-service-system` | 系统管理 | ❌ 不改（Admin 底座） |
-| `cyrene-starter-solon` | 启动配置 | ❌ 不改 |
-| `cyrene-ui` | 前端界面 | ⚠️ 谨慎修改 |
-
 ## 技术栈
 
 - **后端**: Solon + Sqltoy + Sa-Token
