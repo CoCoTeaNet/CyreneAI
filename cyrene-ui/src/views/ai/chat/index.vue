@@ -23,6 +23,13 @@
               @click.stop="exportChat(conv.id)"
             />
             <el-button
+              :icon="Share"
+              size="small"
+              circle
+              class="chat-sidebar-action"
+              @click.stop="shareChat(conv.id)"
+            />
+            <el-button
               :icon="Delete"
               size="small"
               type="danger"
@@ -79,6 +86,12 @@
             <el-form-item label="System Prompt">
               <el-input v-model="chatParams.systemPrompt" placeholder="Optional system prompt" style="width: 300px" />
             </el-form-item>
+            <el-form-item label="Context Strategy">
+              <el-select v-model="chatParams.contextStrategy" style="width: 140px">
+                <el-option label="Truncate" value="truncate" />
+                <el-option label="Summarize" value="summarize" />
+              </el-select>
+            </el-form-item>
           </el-form>
         </div>
       </el-collapse-transition>
@@ -92,14 +105,35 @@
           v-for="(msg, idx) in messages"
           :key="idx"
           :class="['chat-msg', msg.role === 'user' ? 'chat-msg-user' : 'chat-msg-assistant']"
+          @mouseenter="hoveredMsgIdx = idx"
+          @mouseleave="hoveredMsgIdx = -1"
         >
           <div class="chat-msg-avatar">
             <el-avatar :icon="msg.role === 'user' ? UserFilled : Promotion" :size="36" />
           </div>
           <div class="chat-msg-content">
             <div class="chat-msg-bubble" v-html="renderContent(msg)" />
+            <div class="chat-msg-actions" v-if="hoveredMsgIdx === idx && !streaming">
+              <el-button
+                v-if="msg.role === 'user'"
+                :icon="Edit"
+                size="small"
+                circle
+                @click="editMessage(idx)"
+              />
+              <el-button
+                :icon="DeleteIcon"
+                size="small"
+                circle
+                type="danger"
+                @click="deleteSingleMessage(idx)"
+              />
+            </div>
             <div v-if="msg.tokenUsage" class="chat-msg-tokens">
               Tokens: {{ msg.tokenUsage.promptTokens }} (prompt) + {{ msg.tokenUsage.completionTokens }} (completion) = {{ msg.tokenUsage.totalTokens }} (total)
+              <span v-if="msg.tokenUsage.cost && msg.tokenUsage.cost !== '0'">
+                &nbsp;| Cost: ¥{{ msg.tokenUsage.cost }}
+              </span>
             </div>
           </div>
         </div>
@@ -135,14 +169,14 @@
 </template>
 
 <script setup lang="ts">
-import {onMounted, ref, nextTick} from 'vue';
+import {onMounted, ref, nextTick, computed} from 'vue';
 import {marked} from 'marked';
 import hljs from 'highlight.js';
 import 'highlight.js/styles/github-dark.css';
-import {Refresh, Setting, Plus, Delete, Download, Upload, UserFilled, Promotion} from '@element-plus/icons-vue';
+import {Refresh, Setting, Plus, Delete, Download, Upload, Edit, Delete as DeleteIcon, Share, UserFilled, Promotion} from '@element-plus/icons-vue';
 import {ElMessage, ElMessageBox} from 'element-plus';
 import {listEnabled} from '@/api/ai/chat-api';
-import {listConversations, createConversation, deleteConversation as apiDeleteConversation, getConversationMessages, exportConversation, importConversation} from '@/api/ai/conversation-api';
+import {listConversations, createConversation, deleteConversation as apiDeleteConversation, getConversationMessages, exportConversation, importConversation, deleteMessage as apiDeleteMessage, clearMessages as apiClearMessages, shareConversation as apiShareConversation} from '@/api/ai/conversation-api';
 import {useChatStream, type ChatMessage, type ChatParams} from '@/composables/useChatStream';
 
 marked.setOptions({
@@ -166,12 +200,15 @@ const chatParams = ref<ChatParams>({
   temperature: 0.7,
   topP: 0.9,
   maxTokens: 2048,
-  systemPrompt: ''
+  systemPrompt: '',
+  contextStrategy: 'truncate'
 });
 const {streaming, sendMessage, stopStream} = useChatStream();
 
 const conversationList = ref<any[]>([]);
 const currentConversationId = ref<string | null>(null);
+const hoveredMsgIdx = ref(-1);
+const editingIdx = ref(-1);
 
 onMounted(() => {
   loadModels();
@@ -219,12 +256,14 @@ async function loadConversation(conv: any) {
     const res = await getConversationMessages(conv.id);
     const data = res?.data || [];
     messages.value = data.map((msg: any) => ({
+      id: msg.id,
       role: msg.role,
       content: msg.content,
       tokenUsage: msg.totalTokens > 0 ? {
         promptTokens: msg.promptTokens,
         completionTokens: msg.completionTokens,
-        totalTokens: msg.totalTokens
+        totalTokens: msg.totalTokens,
+        cost: msg.cost != null ? String(msg.cost) : undefined
       } : undefined
     }));
   } catch {
@@ -255,18 +294,77 @@ async function exportChat(id: string) {
   try {
     const res = await exportConversation(id);
     const data = res?.data;
-    if (data) {
-      const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `chat-${id}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-      ElMessage.success('Exported');
+    if (!data) return;
+
+    const chooseFormat = await ElMessageBox.prompt('Export format: json, markdown, or txt', 'Export', {
+      inputValue: 'json',
+      inputPlaceholder: 'json / markdown / txt'
+    });
+    const format = (chooseFormat.value || 'json').toLowerCase();
+
+    let content: string;
+    let filename: string;
+    let mimeType: string;
+
+    if (format === 'markdown' || format === 'md') {
+      content = formatAsMarkdown(data);
+      filename = `chat-${id}.md`;
+      mimeType = 'text/markdown';
+    } else if (format === 'txt') {
+      content = formatAsText(data);
+      filename = `chat-${id}.txt`;
+      mimeType = 'text/plain';
+    } else {
+      content = JSON.stringify(data, null, 2);
+      filename = `chat-${id}.json`;
+      mimeType = 'application/json';
+    }
+
+    const blob = new Blob([content], {type: mimeType});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    ElMessage.success(`Exported as ${format}`);
+  } catch {
+    // cancelled
+  }
+}
+
+function formatAsMarkdown(data: any): string {
+  const title = data.conversation?.title || 'Chat Export';
+  let md = `# ${title}\n\n`;
+  const messages = data.messages || [];
+  for (const msg of messages) {
+    const role = msg.role === 'user' ? '**You**' : '**Assistant**';
+    md += `${role}:\n\n${msg.content}\n\n---\n\n`;
+  }
+  return md;
+}
+
+function formatAsText(data: any): string {
+  const title = data.conversation?.title || 'Chat Export';
+  let txt = `${title}\n${'='.repeat(title.length)}\n\n`;
+  const messages = data.messages || [];
+  for (const msg of messages) {
+    const role = msg.role === 'user' ? 'You' : 'Assistant';
+    txt += `${role}:\n${msg.content}\n\n${'-'.repeat(40)}\n\n`;
+  }
+  return txt;
+}
+
+async function shareChat(id: string) {
+  try {
+    const res = await apiShareConversation(id);
+    const data = res?.data;
+    if (data?.url) {
+      await navigator.clipboard.writeText(window.location.origin + data.url);
+      ElMessage.success('Share link copied to clipboard!');
     }
   } catch {
-    ElMessage.error('Export failed');
+    ElMessage.error('Share failed');
   }
 }
 
@@ -297,12 +395,67 @@ async function onSend() {
   const content = userInput.value.trim();
   if (!content || streaming.value) return;
   userInput.value = '';
-  await sendMessage(messages, selectedModelId.value, content, chatParams.value, currentConversationId.value);
+
+  let editMsgId: string | null = null;
+
+  // If editing a previous message, truncate local messages and set editMessageId
+  if (editingIdx.value >= 0) {
+    const editedMsg = messages.value[editingIdx.value];
+    if (editedMsg.id) {
+      editMsgId = editedMsg.id;
+    }
+    // Truncate local messages from the edited message onward
+    messages.value = messages.value.slice(0, editingIdx.value);
+    editingIdx.value = -1;
+  }
+
+  await sendMessage(messages, selectedModelId.value, content, chatParams.value, currentConversationId.value, editMsgId);
   await scrollToBottom();
+  // Reload conversations to pick up auto-generated title
+  loadConversations();
 }
 
-function clearChat() {
-  messages.value = [];
+function editMessage(idx: number) {
+  const msg = messages.value[idx];
+  if (msg.role !== 'user') return;
+  userInput.value = msg.content;
+  editingIdx.value = idx;
+}
+
+async function deleteSingleMessage(idx: number) {
+  const msg = messages.value[idx];
+  try {
+    await ElMessageBox.confirm('Delete this message?', 'Warning', {
+      confirmButtonText: 'OK',
+      cancelButtonText: 'Cancel',
+      type: 'warning'
+    });
+    if (msg.id && currentConversationId.value) {
+      await apiDeleteMessage(msg.id);
+    }
+    messages.value.splice(idx, 1);
+    ElMessage.success('Deleted');
+  } catch {
+    // cancelled
+  }
+}
+
+async function clearChat() {
+  if (messages.value.length === 0) return;
+  try {
+    await ElMessageBox.confirm('Clear all messages?', 'Warning', {
+      confirmButtonText: 'OK',
+      cancelButtonText: 'Cancel',
+      type: 'warning'
+    });
+    if (currentConversationId.value) {
+      await apiClearMessages(currentConversationId.value);
+    }
+    messages.value = [];
+    ElMessage.success('Cleared');
+  } catch {
+    // cancelled
+  }
 }
 
 function renderContent(msg: ChatMessage): string {
@@ -472,6 +625,19 @@ async function scrollToBottom() {
   font-size: 11px;
   color: var(--el-text-color-secondary);
   padding: 0 4px;
+  margin-top: 4px;
+}
+
+.chat-msg-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 0 4px;
+}
+
+.chat-msg-actions .el-button {
+  padding: 4px;
+  min-height: 24px;
 }
 
 .chat-msg-user .chat-msg-bubble {

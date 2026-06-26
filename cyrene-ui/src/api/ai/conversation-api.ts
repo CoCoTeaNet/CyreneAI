@@ -9,7 +9,7 @@ export function createConversation(data: any) {
 }
 
 export function deleteConversation(id: string) {
-    return request('ai/conversation/delete', {id}, 'POST');
+    return request(`ai/conversation/delete/${id}`, {}, 'POST');
 }
 
 export function getConversationMessages(conversationId: string) {
@@ -17,11 +17,11 @@ export function getConversationMessages(conversationId: string) {
 }
 
 export function deleteMessage(id: string) {
-    return request('ai/conversation/deleteMessage', {id}, 'POST');
+    return request(`ai/conversation/deleteMessage/${id}`, {}, 'POST');
 }
 
 export function clearMessages(conversationId: string) {
-    return request('ai/conversation/clearMessages', {conversationId}, 'POST');
+    return request(`ai/conversation/clearMessages/${conversationId}`, {}, 'POST');
 }
 
 export function exportConversation(conversationId: string) {
@@ -30,4 +30,12 @@ export function exportConversation(conversationId: string) {
 
 export function importConversation(data: any) {
     return request('ai/conversation/import', data, 'POST');
+}
+
+export function truncateMessages(conversationId: string, afterMessageId: string) {
+    return request(`ai/conversation/truncateMessages/${conversationId}/${afterMessageId}`, {}, 'POST');
+}
+
+export function shareConversation(conversationId: string) {
+    return request(`ai/conversation/share/${conversationId}`, {}, 'POST');
 }

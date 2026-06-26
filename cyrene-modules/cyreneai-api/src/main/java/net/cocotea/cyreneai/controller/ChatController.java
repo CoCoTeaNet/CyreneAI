@@ -23,6 +23,7 @@ import dev.langchain4j.model.googleai.GoogleAiGeminiStreamingChatModel;
 import lombok.extern.slf4j.Slf4j;
 import net.cocotea.cyreneai.model.dto.ChatRequestDTO;
 import net.cocotea.cyreneai.model.dto.ChatRequestDTO.ChatMessageDTO;
+import net.cocotea.cyreneai.model.po.AiConversation;
 import net.cocotea.cyreneai.model.po.AiModel;
 import net.cocotea.cyreneai.model.po.AiModelProvider;
 import net.cocotea.cyreneai.service.AiConversationService;
@@ -39,7 +40,9 @@ import org.sagacity.sqltoy.solon.annotation.Db;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -79,6 +82,7 @@ public class ChatController {
         CountDownLatch latch = new CountDownLatch(1);
         StringBuilder responseContent = new StringBuilder();
         final int[] tokenCounts = new int[3]; // prompt, completion, total
+        final BigDecimal[] cost = new BigDecimal[1]; // calculated cost
 
         try {
             AiModel aiModel = getAiModel(request.getModelId());
@@ -88,6 +92,15 @@ public class ChatController {
                 return;
             }
 
+            // If editing a message, truncate all messages after (and including) the edited one
+            if (request.getConversationId() != null && request.getEditMessageId() != null) {
+                conversationService.truncateMessages(request.getConversationId(), request.getEditMessageId());
+                log.info("Truncated messages after editMessageId={}", request.getEditMessageId());
+            }
+
+            BigDecimal inputPrice = aiModel.getInputPrice();
+            BigDecimal outputPrice = aiModel.getOutputPrice();
+
             StreamingChatModel model = buildStreamingModel(aiModel, request);
             if (model == null) {
                 writeSseData(out, JSONUtil.toJsonStr(Map.of("error", "No available model provider")));
@@ -96,7 +109,7 @@ public class ChatController {
             }
 
             List<ChatMessage> messages = convertMessages(request.getMessages(), request.getSystemPrompt());
-            messages = truncateMessages(messages, aiModel.getContextWindow());
+            messages = compressMessages(messages, aiModel, request);
             model.chat(messages, new StreamingChatResponseHandler() {
                 @Override
                 public void onPartialResponse(String token) {
@@ -117,11 +130,24 @@ public class ChatController {
                             tokenCounts[0] = tokenUsage.inputTokenCount();
                             tokenCounts[1] = tokenUsage.outputTokenCount();
                             tokenCounts[2] = tokenCounts[0] + tokenCounts[1];
+
+                            // Calculate cost
+                            if (inputPrice != null && outputPrice != null) {
+                                BigDecimal promptCost = BigDecimal.valueOf(tokenCounts[0])
+                                        .divide(BigDecimal.valueOf(1000), 6, RoundingMode.HALF_UP)
+                                        .multiply(inputPrice);
+                                BigDecimal completionCost = BigDecimal.valueOf(tokenCounts[1])
+                                        .divide(BigDecimal.valueOf(1000), 6, RoundingMode.HALF_UP)
+                                        .multiply(outputPrice);
+                                cost[0] = promptCost.add(completionCost).setScale(6, RoundingMode.HALF_UP);
+                            }
+
                             writeSseData(out, JSONUtil.toJsonStr(Map.of(
                                     "type", "token_usage",
                                     "promptTokens", tokenCounts[0],
                                     "completionTokens", tokenCounts[1],
-                                    "totalTokens", tokenCounts[2]
+                                    "totalTokens", tokenCounts[2],
+                                    "cost", cost[0] != null ? cost[0].toPlainString() : "0"
                             )));
                         }
                         writeSseData(out, "[DONE]");
@@ -165,11 +191,11 @@ public class ChatController {
 
         // Save messages to database if conversationId is provided
         if (request.getConversationId() != null) {
-            saveMessages(request, responseContent.toString(), tokenCounts);
+            saveMessages(request, responseContent.toString(), tokenCounts, cost[0]);
         }
     }
 
-    private void saveMessages(ChatRequestDTO request, String responseContent, int[] tokenCounts) {
+    private void saveMessages(ChatRequestDTO request, String responseContent, int[] tokenCounts, BigDecimal cost) {
         try {
             // Save the last user message
             if (request.getMessages() != null && !request.getMessages().isEmpty()) {
@@ -180,6 +206,9 @@ public class ChatController {
                     userMessage.setRole("user");
                     userMessage.setContent(lastUserMsg.getContent());
                     conversationService.saveMessage(userMessage);
+
+                    // Auto-generate title from the first user message
+                    autoGenerateTitle(request.getConversationId(), lastUserMsg.getContent());
                 }
             }
 
@@ -192,10 +221,27 @@ public class ChatController {
                 assistantMessage.setPromptTokens(tokenCounts[0]);
                 assistantMessage.setCompletionTokens(tokenCounts[1]);
                 assistantMessage.setTotalTokens(tokenCounts[2]);
+                assistantMessage.setCost(cost);
                 conversationService.saveMessage(assistantMessage);
             }
         } catch (Exception e) {
             log.error("Failed to save messages", e);
+        }
+    }
+
+    private void autoGenerateTitle(BigInteger conversationId, String userMessageContent) {
+        try {
+            AiConversation conv = conversationService.findById(conversationId);
+            if (conv == null) return;
+            // Only generate title if current title is default
+            if (conv.getTitle() != null && !"New Chat".equals(conv.getTitle())) return;
+            String title = userMessageContent.strip();
+            if (title.length() > 30) {
+                title = title.substring(0, 30) + "...";
+            }
+            conversationService.updateTitle(conversationId, title);
+        } catch (Exception e) {
+            log.error("Failed to auto-generate title", e);
         }
     }
 
@@ -328,7 +374,8 @@ public class ChatController {
         return messages;
     }
 
-    private List<ChatMessage> truncateMessages(List<ChatMessage> messages, Integer contextWindow) {
+    private List<ChatMessage> compressMessages(List<ChatMessage> messages, AiModel aiModel, ChatRequestDTO request) {
+        Integer contextWindow = aiModel.getContextWindow();
         if (contextWindow == null || contextWindow <= 0) {
             return messages;
         }
@@ -345,7 +392,12 @@ public class ChatController {
             return messages;
         }
 
-        // Keep system message if present, truncate from oldest messages
+        // Use summarization strategy if requested
+        if ("summarize".equals(request.getContextStrategy())) {
+            return summarizeMessages(messages, aiModel, contextWindow);
+        }
+
+        // Default: truncate oldest non-system messages
         List<ChatMessage> truncated = new ArrayList<>();
         int remainingTokens = (int) (contextWindow * 0.8);
 
@@ -357,7 +409,6 @@ public class ChatController {
             }
         }
 
-        // Add messages from newest to oldest until we hit the limit
         List<ChatMessage> nonSystemMessages = messages.stream()
                 .filter(m -> !(m instanceof SystemMessage))
                 .toList();
@@ -367,7 +418,7 @@ public class ChatController {
             int msgTokens = getTextFromMessage(msg).length() / 4;
             if (remainingTokens >= msgTokens) {
                 remainingTokens -= msgTokens;
-                truncated.add(1, msg); // Insert after system message
+                truncated.add(1, msg);
             } else {
                 break;
             }
@@ -376,6 +427,90 @@ public class ChatController {
         log.info("Truncated messages from {} to {} (estimated tokens: {} -> {})",
                 messages.size(), truncated.size(), estimatedTokens, estimatedTokens - remainingTokens);
         return truncated;
+    }
+
+    private List<ChatMessage> summarizeMessages(List<ChatMessage> messages, AiModel aiModel, Integer contextWindow) {
+        int targetTokens = (int) (contextWindow * 0.5);
+        List<ChatMessage> keep = new ArrayList<>();
+        List<ChatMessage> toSummarize = new ArrayList<>();
+        int accumulated = 0;
+
+        // Collect messages to summarize (oldest first) until we hit half the budget
+        for (ChatMessage msg : messages) {
+            String text = getTextFromMessage(msg);
+            int msgTokens = text.length() / 4;
+            if (msg instanceof SystemMessage) {
+                keep.add(msg);
+            } else if (accumulated + msgTokens <= targetTokens) {
+                accumulated += msgTokens;
+                toSummarize.add(msg);
+            } else if (accumulated > 0) {
+                break;
+            } else {
+                // Single message exceeds budget, keep it anyway
+                keep.add(msg);
+            }
+        }
+
+        if (toSummarize.isEmpty()) {
+            return messages;
+        }
+
+        // Build summarization prompt
+        StringBuilder summaryInput = new StringBuilder();
+        summaryInput.append("Please summarize the following conversation concisely to preserve context:\n\n");
+        for (ChatMessage msg : toSummarize) {
+            String role = msg instanceof UserMessage ? "User" : "Assistant";
+            summaryInput.append(role).append(": ").append(getTextFromMessage(msg)).append("\n");
+        }
+        summaryInput.append("\nSummary:");
+
+        try {
+            AiModelProvider provider = lightDao.load(new AiModelProvider(aiModel.getProviderId()));
+            if (provider != null && provider.getIsDeleted() == 0 && provider.getEnableStatus() == 1) {
+                ChatModel chatModel = buildChatModel(provider, aiModel);
+                if (chatModel != null) {
+                    String summary = chatModel.chat(summaryInput.toString());
+                    keep.add(0, new SystemMessage("Previous conversation summary: " + summary));
+                    log.info("Summarized {} messages into a summary", toSummarize.size());
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Summarization failed, falling back to truncation", e);
+            // Fallback: keep only the last few messages
+            int fallbackTokens = (int) (contextWindow * 0.8);
+            for (ChatMessage msg : messages) {
+                if (msg instanceof SystemMessage) {
+                    keep.add(msg);
+                }
+            }
+            for (int i = messages.size() - 1; i >= 0; i--) {
+                ChatMessage msg = messages.get(i);
+                if (msg instanceof SystemMessage) continue;
+                int msgTokens = getTextFromMessage(msg).length() / 4;
+                if (fallbackTokens >= msgTokens) {
+                    fallbackTokens -= msgTokens;
+                    keep.add(1, msg);
+                } else {
+                    break;
+                }
+            }
+        }
+
+        // Add remaining messages that weren't summarized
+        boolean summarizingDone = false;
+        for (ChatMessage msg : messages) {
+            if (msg instanceof SystemMessage) continue;
+            if (!summarizingDone && !toSummarize.contains(msg)) {
+                summarizingDone = true;
+            }
+            if (summarizingDone && !toSummarize.contains(msg)) {
+                keep.add(msg);
+            }
+        }
+
+        log.info("Summarized context: kept {} messages after summarization", keep.size());
+        return keep;
     }
 
     private String getTextFromMessage(ChatMessage msg) {

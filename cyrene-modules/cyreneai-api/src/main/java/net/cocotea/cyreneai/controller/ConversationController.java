@@ -41,8 +41,8 @@ public class ConversationController {
         return ApiResult.ok(created);
     }
 
-    @Post @Mapping("/delete")
-    public ApiResult<?> delete(@Body BigInteger id) {
+    @Post @Mapping("/delete/{id}")
+    public ApiResult<?> delete(@Param("id") BigInteger id) {
         conversationService.deleteById(id);
         return ApiResult.ok();
     }
@@ -59,15 +59,37 @@ public class ConversationController {
         return ApiResult.ok(saved);
     }
 
-    @Post @Mapping("/deleteMessage")
-    public ApiResult<?> deleteMessage(@Body BigInteger id) {
+    @Post @Mapping("/deleteMessage/{id}")
+    public ApiResult<?> deleteMessage(@Param("id") BigInteger id) {
         conversationService.deleteMessage(id);
         return ApiResult.ok();
     }
 
-    @Post @Mapping("/clearMessages")
-    public ApiResult<?> clearMessages(@Body BigInteger conversationId) {
+    @Post @Mapping("/clearMessages/{conversationId}")
+    public ApiResult<?> clearMessages(@Param("conversationId") BigInteger conversationId) {
         conversationService.clearMessages(conversationId);
+        return ApiResult.ok();
+    }
+
+    @Post @Mapping("/share/{conversationId}")
+    public ApiResult<Map<String, String>> share(@Param("conversationId") BigInteger conversationId) {
+        String token = conversationService.shareConversation(conversationId);
+        return ApiResult.ok(Map.of("token", token, "url", "/api/ai/conversation/shared/" + token));
+    }
+
+    @Get @Mapping("/shared/{token}")
+    public ApiResult<?> getShared(@Param("token") String token) {
+        Map<String, Object> data = conversationService.getSharedConversation(token);
+        if (data == null) {
+            return ApiResult.error("Share link expired or invalid");
+        }
+        return ApiResult.ok(data);
+    }
+
+    @Post @Mapping("/truncateMessages/{conversationId}/{afterMessageId}")
+    public ApiResult<?> truncateMessages(@Param("conversationId") BigInteger conversationId,
+                                         @Param("afterMessageId") BigInteger afterMessageId) {
+        conversationService.truncateMessages(conversationId, afterMessageId);
         return ApiResult.ok();
     }
 

@@ -4,12 +4,14 @@ import { useUserStore } from '@/stores/user';
 export type ChatRole = 'user' | 'assistant' | 'system';
 
 export interface ChatMessage {
+    id?: string;
     role: ChatRole;
     content: string;
     tokenUsage?: {
         promptTokens: number;
         completionTokens: number;
         totalTokens: number;
+        cost?: string;
     };
 }
 
@@ -18,6 +20,7 @@ export interface ChatParams {
     topP?: number;
     maxTokens?: number;
     systemPrompt?: string;
+    contextStrategy?: string;
 }
 
 export function useChatStream() {
@@ -30,7 +33,8 @@ export function useChatStream() {
         modelId: string | null,
         userContent: string,
         params?: ChatParams,
-        conversationId?: string | null
+        conversationId?: string | null,
+        editMessageId?: string | null
     ): Promise<void> {
         // 1. 修复逻辑：如果正在流式传输，先中断之前的请求，防止并发冲突
         if (streaming.value) {
@@ -70,11 +74,16 @@ export function useChatStream() {
             body.conversationId = conversationId;
         }
 
+        if (editMessageId) {
+            body.editMessageId = editMessageId;
+        }
+
         if (params) {
             if (params.temperature !== undefined) body.temperature = params.temperature;
             if (params.topP !== undefined) body.topP = params.topP;
             if (params.maxTokens !== undefined) body.maxTokens = params.maxTokens;
             if (params.systemPrompt) body.systemPrompt = params.systemPrompt;
+            if (params.contextStrategy) body.contextStrategy = params.contextStrategy;
         }
 
         try {
@@ -121,7 +130,8 @@ export function useChatStream() {
                             assistantMsg.tokenUsage = {
                                 promptTokens: parsed.promptTokens,
                                 completionTokens: parsed.completionTokens,
-                                totalTokens: parsed.totalTokens
+                                totalTokens: parsed.totalTokens,
+                                cost: parsed.cost
                             };
                             messages.value = [...messages.value];
                         }

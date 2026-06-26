@@ -195,6 +195,7 @@ CREATE TABLE IF NOT EXISTS `ai_message` (
     `prompt_tokens` INT DEFAULT 0 COMMENT '输入token数',
     `completion_tokens` INT DEFAULT 0 COMMENT '输出token数',
     `total_tokens` INT DEFAULT 0 COMMENT '总token数',
+    `cost` DECIMAL(12,6) DEFAULT 0 COMMENT '本次花费(元)',
     `created_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (`id`),
     INDEX `idx_conversation_id` (`conversation_id`),

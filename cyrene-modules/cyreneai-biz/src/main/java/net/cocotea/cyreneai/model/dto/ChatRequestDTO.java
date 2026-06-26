@@ -19,7 +19,13 @@ public class ChatRequestDTO implements Serializable {
 
     private BigInteger modelId;
 
+    /** If set, truncate all messages after (and including) this message before saving */
+    private BigInteger editMessageId;
+
     private List<ChatMessageDTO> messages;
+
+    /** Context window strategy: "truncate" (default) or "summarize" */
+    private String contextStrategy;
 
     private Double temperature;
 

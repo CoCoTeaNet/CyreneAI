@@ -8,6 +8,7 @@ import org.sagacity.sqltoy.config.annotation.Id;
 
 import java.io.Serial;
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.LocalDateTime;
 
@@ -40,6 +41,9 @@ public class AiMessage implements Serializable {
 
     @Column(name = "total_tokens", comment = "总token数", length = 10L, type = java.sql.Types.INTEGER, nullable = true, defaultValue = "0")
     private Integer totalTokens;
+
+    @Column(name = "cost", comment = "本次花费(元)", length = 12L, type = java.sql.Types.DECIMAL, nullable = true, defaultValue = "0")
+    private BigDecimal cost;
 
     @Column(name = "created_time", comment = "创建时间", type = java.sql.Types.TIMESTAMP, nullable = true)
     private LocalDateTime createdTime;

@@ -5,6 +5,7 @@ import net.cocotea.cyreneai.model.po.AiMessage;
 
 import java.math.BigInteger;
 import java.util.List;
+import java.util.Map;
 
 public interface AiConversationService {
 
@@ -23,4 +24,14 @@ public interface AiConversationService {
     void deleteMessage(BigInteger id);
 
     void clearMessages(BigInteger conversationId);
+
+    void truncateMessages(BigInteger conversationId, BigInteger afterMessageId);
+
+    AiMessage updateMessage(AiMessage message);
+
+    void updateTitle(BigInteger id, String title);
+
+    String shareConversation(BigInteger id);
+
+    Map<String, Object> getSharedConversation(String token);
 }
