@@ -170,3 +170,33 @@ CREATE TABLE `ai_model` (
   PRIMARY KEY (`id`),
   KEY `ai_model_provider_id_index` (`provider_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC COMMENT='AI 模型表';
+
+-- AI对话表
+CREATE TABLE IF NOT EXISTS `ai_conversation` (
+                                                 `id` BIGINT NOT NULL COMMENT '主键ID',
+                                                 `title` VARCHAR(200) DEFAULT NULL COMMENT '对话标题',
+    `user_id` BIGINT NOT NULL COMMENT '用户ID',
+    `model_id` BIGINT DEFAULT NULL COMMENT '模型ID',
+    `system_prompt` TEXT DEFAULT NULL COMMENT '系统提示词',
+    `created_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `is_deleted` TINYINT DEFAULT 0 COMMENT '是否删除 0:否 1:是',
+    PRIMARY KEY (`id`),
+    INDEX `idx_user_id` (`user_id`),
+    INDEX `idx_created_time` (`created_time`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='AI对话表';
+
+-- AI消息表
+CREATE TABLE IF NOT EXISTS `ai_message` (
+                                            `id` BIGINT NOT NULL COMMENT '主键ID',
+                                            `conversation_id` BIGINT NOT NULL COMMENT '对话ID',
+                                            `role` VARCHAR(20) NOT NULL COMMENT '角色: user/assistant/system',
+    `content` TEXT NOT NULL COMMENT '消息内容',
+    `prompt_tokens` INT DEFAULT 0 COMMENT '输入token数',
+    `completion_tokens` INT DEFAULT 0 COMMENT '输出token数',
+    `total_tokens` INT DEFAULT 0 COMMENT '总token数',
+    `created_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    INDEX `idx_conversation_id` (`conversation_id`),
+    INDEX `idx_created_time` (`created_time`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='AI消息表';

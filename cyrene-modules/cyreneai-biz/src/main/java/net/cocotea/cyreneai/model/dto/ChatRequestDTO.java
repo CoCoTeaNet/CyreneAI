@@ -15,9 +15,19 @@ public class ChatRequestDTO implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 
+    private BigInteger conversationId;
+
     private BigInteger modelId;
 
     private List<ChatMessageDTO> messages;
+
+    private Double temperature;
+
+    private Double topP;
+
+    private Integer maxTokens;
+
+    private String systemPrompt;
 
     @Data
     @Accessors(chain = true)

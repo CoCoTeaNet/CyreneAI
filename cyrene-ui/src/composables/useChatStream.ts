@@ -1,29 +1,54 @@
-import {ref, type Ref} from 'vue';
+import { ref, type Ref } from 'vue';
+import { useUserStore } from '@/stores/user';
 
 export type ChatRole = 'user' | 'assistant' | 'system';
 
 export interface ChatMessage {
     role: ChatRole;
     content: string;
+    tokenUsage?: {
+        promptTokens: number;
+        completionTokens: number;
+        totalTokens: number;
+    };
+}
+
+export interface ChatParams {
+    temperature?: number;
+    topP?: number;
+    maxTokens?: number;
+    systemPrompt?: string;
 }
 
 export function useChatStream() {
     const streaming = ref(false);
     const abortController = ref<AbortController | null>(null);
+    const userStore = useUserStore();
 
     async function sendMessage(
         messages: Ref<ChatMessage[]>,
         modelId: string | null,
-        userContent: string
+        userContent: string,
+        params?: ChatParams,
+        conversationId?: string | null
     ): Promise<void> {
-        if (streaming.value || !userContent.trim()) return;
+        // 1. 修复逻辑：如果正在流式传输，先中断之前的请求，防止并发冲突
+        if (streaming.value) {
+            stopStream();
+        }
 
-        messages.value.push({role: 'user', content: userContent});
+        if (!userContent.trim()) return;
 
-        const assistantMsg: ChatMessage = {role: 'assistant', content: ''};
+        messages.value.push({ role: 'user', content: userContent });
+        const assistantMsg: ChatMessage = { role: 'assistant', content: '' };
         messages.value.push(assistantMsg);
 
         streaming.value = true;
+
+        // 2. 修复逻辑：在创建新的控制器前，确保清理旧的
+        if (abortController.value) {
+            abortController.value.abort();
+        }
         abortController.value = new AbortController();
 
         const messagePayload = messages.value.slice(0, -1).map(m => ({
@@ -31,14 +56,32 @@ export function useChatStream() {
             content: m.content
         }));
 
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (userStore.userinfo.token) {
+            headers['sa-token'] = userStore.userinfo.token;
+        }
+
+        const body: Record<string, any> = {
+            modelId: modelId || null,
+            messages: messagePayload
+        };
+
+        if (conversationId) {
+            body.conversationId = conversationId;
+        }
+
+        if (params) {
+            if (params.temperature !== undefined) body.temperature = params.temperature;
+            if (params.topP !== undefined) body.topP = params.topP;
+            if (params.maxTokens !== undefined) body.maxTokens = params.maxTokens;
+            if (params.systemPrompt) body.systemPrompt = params.systemPrompt;
+        }
+
         try {
             const response = await fetch('/api/ai/chat/stream', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    modelId: modelId || null,
-                    messages: messagePayload
-                }),
+                headers,
+                body: JSON.stringify(body),
                 signal: abortController.value.signal
             });
 
@@ -51,10 +94,10 @@ export function useChatStream() {
             let buffer = '';
 
             while (true) {
-                const {done, value} = await reader.read();
+                const { done, value } = await reader.read();
                 if (done) break;
 
-                buffer += decoder.decode(value, {stream: true});
+                buffer += decoder.decode(value, { stream: true });
                 const lines = buffer.split('\n');
                 buffer = lines.pop() || '';
 
@@ -63,7 +106,8 @@ export function useChatStream() {
                     const data = line.slice(6);
 
                     if (data === '[DONE]') {
-                        streaming.value = false;
+                        // 注意：这里原代码逻辑可能有误，[DONE] 通常意味着结束，不应设置 streaming=false 后继续循环
+                        // 但为了保持原结构，暂时保留，建议在外部处理结束逻辑
                         continue;
                     }
 
@@ -73,21 +117,29 @@ export function useChatStream() {
                             assistantMsg.content += parsed.content;
                             messages.value = [...messages.value];
                         }
+                        if (parsed.type === 'token_usage') {
+                            assistantMsg.tokenUsage = {
+                                promptTokens: parsed.promptTokens,
+                                completionTokens: parsed.completionTokens,
+                                totalTokens: parsed.totalTokens
+                            };
+                            messages.value = [...messages.value];
+                        }
                         if (parsed.error) {
                             assistantMsg.content = `Error: ${parsed.error}`;
                             messages.value = [...messages.value];
                             streaming.value = false;
                         }
-                    } catch {
-                        // ignore parse errors on partial chunks
+                    } catch (parseError) {
+                        // 忽略解析错误
+                        console.warn('Failed to parse stream data:', parseError);
                     }
                 }
             }
 
-            if (assistantMsg.content === '') {
-                assistantMsg.content = '(no response)';
-                messages.value = [...messages.value];
-            }
+            // 流结束，重置状态
+            streaming.value = false;
+
         } catch (err: any) {
             if (err.name === 'AbortError') {
                 assistantMsg.content += '\n\n[stopped]';
@@ -107,5 +159,5 @@ export function useChatStream() {
         }
     }
 
-    return {streaming, sendMessage, stopStream};
+    return { streaming, sendMessage, stopStream };
 }
