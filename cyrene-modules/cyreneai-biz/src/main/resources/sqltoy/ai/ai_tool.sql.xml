@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<sqltoy xmlns="http://www.sagframe.com/schema/sqltoy"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.sagframe.com/schema/sqltoy http://www.sagframe.com/schema/sqltoy/sqltoy.xsd">
+
+    <sql id="ai_tool_findList">
+        <value>
+            <![CDATA[
+            select t.id, t.name, t.description, t.type, t.schema_json, t.url,
+                   t.auth_type, t.auth_value, t.http_method, t.builtin_handler,
+                   t.enable_status, t.sort,
+                   t.create_by, t.create_time, t.update_by, t.update_time
+            from ai_tool t
+            where t.is_deleted=0
+            #[and t.name = :name]
+            #[and t.type = :type]
+            #[and t.builtin_handler = :builtinHandler]
+            #[and t.enable_status = :enableStatus]
+            order by t.sort desc, t.id desc
+            ]]>
+        </value>
+    </sql>
+
+</sqltoy>

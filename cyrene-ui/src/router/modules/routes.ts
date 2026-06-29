@@ -16,6 +16,9 @@ const AiChatView = () => import("@/views/ai/chat/index.vue");
 const AiDocumentView = () => import("@/views/ai/document/index.vue");
 const AiKnowledgeBaseView = () => import("@/views/ai/knowledge-base/index.vue");
 const AiEmbeddingModelView = () => import("@/views/ai/embedding-model/index.vue");
+const AiToolView = () => import("@/views/ai/tool/index.vue");
+const AiAgentView = () => import("@/views/ai/agent/index.vue");
+const AgentChatView = () => import("@/views/ai/agent-chat/index.vue");
 
 
 export const routes = [
@@ -50,6 +53,9 @@ export const routes = [
             {path: 'ai-document', meta: {title: '文档管理'}, name: 'AiDocumentView', component: AiDocumentView},
             {path: 'ai-knowledge-base', meta: {title: '知识库'}, name: 'AiKnowledgeBaseView', component: AiKnowledgeBaseView},
             {path: 'ai-embedding-model', meta: {title: '嵌入模型'}, name: 'AiEmbeddingModelView', component: AiEmbeddingModelView},
+            {path: 'ai-tool', meta: {title: '工具管理'}, name: 'AiToolView', component: AiToolView},
+            {path: 'ai-agent', meta: {title: '智能体'}, name: 'AiAgentView', component: AiAgentView},
+            {path: 'ai-agent-chat', meta: {title: '智能体对话'}, name: 'AgentChatView', component: AgentChatView},
         ]
     },
     {

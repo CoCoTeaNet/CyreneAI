@@ -34,8 +34,8 @@ public class WebScraperService {
 
         // Clean up whitespace
         text = text.replaceAll("\\s+", " ").strip();
-        if (text.length() > 100) {
-            text = text.substring(0, text.length() - 1);
+        if (text.length() > 10000) {
+            text = text.substring(0, 10000);
         }
 
         return new ScrapedResult(title, text, url);

@@ -288,3 +288,85 @@ CREATE TABLE IF NOT EXISTS `ai_kb_document` (
     INDEX `idx_kb_id` (`kb_id`),
     INDEX `idx_document_id` (`document_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='知识库文档关联表';
+
+-- ============================================================
+-- Phase 4: Agent / Tool Calling
+-- ============================================================
+
+-- AI工具表
+CREATE TABLE IF NOT EXISTS `ai_tool` (
+    `id` BIGINT NOT NULL COMMENT '主键ID',
+    `name` VARCHAR(100) NOT NULL COMMENT '工具名称',
+    `description` VARCHAR(500) DEFAULT NULL COMMENT '工具描述',
+    `type` VARCHAR(20) NOT NULL COMMENT '工具类型;builtin, custom',
+    `schema_json` TEXT DEFAULT NULL COMMENT '参数JSON Schema',
+    `url` VARCHAR(500) DEFAULT NULL COMMENT '自定义工具URL',
+    `auth_type` VARCHAR(20) DEFAULT NULL COMMENT '认证类型;none, bearer, basic',
+    `auth_value` VARCHAR(500) DEFAULT NULL COMMENT '认证值',
+    `http_method` VARCHAR(10) DEFAULT 'POST' COMMENT 'HTTP方法;GET, POST',
+    `builtin_handler` VARCHAR(50) DEFAULT NULL COMMENT '内置工具处理器标识;calculator,datetime,websearch,knowledgebase,codeexecution,imagegen,imagerec,weather',
+    `enable_status` TINYINT DEFAULT 1 COMMENT '启用状态;0关闭 1启用',
+    `sort` INT DEFAULT 0 COMMENT '排序号',
+    `create_by` BIGINT NOT NULL COMMENT '创建人',
+    `create_time` DATETIME NOT NULL COMMENT '创建时间',
+    `update_by` BIGINT DEFAULT NULL COMMENT '更新人',
+    `update_time` DATETIME DEFAULT NULL COMMENT '更新时间',
+    `is_deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除',
+    `revision` INT DEFAULT NULL COMMENT '乐观锁',
+    PRIMARY KEY (`id`),
+    INDEX `idx_type` (`type`),
+    INDEX `idx_builtin_handler` (`builtin_handler`),
+    INDEX `idx_enable_status` (`enable_status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='AI工具表';
+
+-- AI智能体表
+CREATE TABLE IF NOT EXISTS `ai_agent` (
+    `id` BIGINT NOT NULL COMMENT '主键ID',
+    `name` VARCHAR(100) NOT NULL COMMENT '智能体名称',
+    `description` VARCHAR(500) DEFAULT NULL COMMENT '智能体描述',
+    `model_id` BIGINT DEFAULT NULL COMMENT '关联模型ID',
+    `system_prompt` TEXT DEFAULT NULL COMMENT '系统提示词',
+    `tool_ids` TEXT DEFAULT NULL COMMENT '关联工具ID列表(JSON数组)',
+    `max_iterations` INT DEFAULT 10 COMMENT '最大迭代次数',
+    `temperature` DECIMAL(3,2) DEFAULT 0.7 COMMENT '温度参数',
+    `top_p` DECIMAL(3,2) DEFAULT 0.9 COMMENT 'Top-P参数',
+    `max_tokens` INT DEFAULT 2048 COMMENT '最大输出token数',
+    `enable_status` TINYINT DEFAULT 1 COMMENT '启用状态;0关闭 1启用',
+    `sort` INT DEFAULT 0 COMMENT '排序号',
+    `create_by` BIGINT NOT NULL COMMENT '创建人',
+    `create_time` DATETIME NOT NULL COMMENT '创建时间',
+    `update_by` BIGINT DEFAULT NULL COMMENT '更新人',
+    `update_time` DATETIME DEFAULT NULL COMMENT '更新时间',
+    `is_deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除',
+    `revision` INT DEFAULT NULL COMMENT '乐观锁',
+    PRIMARY KEY (`id`),
+    INDEX `idx_enable_status` (`enable_status`),
+    INDEX `idx_model_id` (`model_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='AI智能体表';
+
+-- AI智能体运行日志表
+CREATE TABLE IF NOT EXISTS `ai_agent_log` (
+    `id` BIGINT NOT NULL COMMENT '主键ID',
+    `agent_id` BIGINT DEFAULT NULL COMMENT '智能体ID',
+    `agent_name` VARCHAR(100) DEFAULT NULL COMMENT '智能体名称',
+    `conversation_id` BIGINT DEFAULT NULL COMMENT '对话ID',
+    `user_id` BIGINT NOT NULL COMMENT '用户ID',
+    `user_input` TEXT DEFAULT NULL COMMENT '用户输入',
+    `final_response` TEXT DEFAULT NULL COMMENT '最终回复',
+    `iteration_count` INT DEFAULT 0 COMMENT '迭代次数',
+    `tool_calls` TEXT DEFAULT NULL COMMENT '工具调用记录(JSON)',
+    `prompt_tokens` INT DEFAULT 0 COMMENT '输入token数',
+    `completion_tokens` INT DEFAULT 0 COMMENT '输出token数',
+    `total_tokens` INT DEFAULT 0 COMMENT '总token数',
+    `cost` DECIMAL(12,6) DEFAULT 0 COMMENT '总花费(元)',
+    `status` VARCHAR(20) DEFAULT 'success' COMMENT '运行状态;success, error, timeout',
+    `error_msg` TEXT DEFAULT NULL COMMENT '错误信息',
+    `execution_time_ms` BIGINT DEFAULT 0 COMMENT '执行耗时(毫秒)',
+    `created_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    INDEX `idx_agent_id` (`agent_id`),
+    INDEX `idx_conversation_id` (`conversation_id`),
+    INDEX `idx_user_id` (`user_id`),
+    INDEX `idx_created_time` (`created_time`),
+    INDEX `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='AI智能体运行日志表';

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<sqltoy xmlns="http://www.sagframe.com/schema/sqltoy"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.sagframe.com/schema/sqltoy http://www.sagframe.com/schema/sqltoy/sqltoy.xsd">
+
+    <sql id="ai_agent_findList">
+        <value>
+            <![CDATA[
+            select a.id, a.name, a.description, a.model_id, a.system_prompt, a.tool_ids,
+                   a.max_iterations, a.temperature, a.top_p, a.max_tokens,
+                   a.enable_status, a.sort,
+                   a.create_by, a.create_time, a.update_by, a.update_time,
+                   m.model_name as model_name
+            from ai_agent a
+            left join ai_model m on m.id = a.model_id
+            where a.is_deleted=0
+            #[and a.name like :name]
+            #[and a.enable_status = :enableStatus]
+            order by a.sort desc, a.id desc
+            ]]>
+        </value>
+    </sql>
+
+    <sql id="ai_agent_log_findList">
+        <value>
+            <![CDATA[
+            select l.id, l.agent_id, l.agent_name, l.conversation_id, l.user_id,
+                   l.user_input, l.final_response, l.iteration_count, l.tool_calls,
+                   l.prompt_tokens, l.completion_tokens, l.total_tokens, l.cost,
+                   l.status, l.error_msg, l.execution_time_ms, l.created_time
+            from ai_agent_log l
+            where 1=1
+            #[and l.agent_id = :agentId]
+            #[and l.status = :status]
+            order by l.created_time desc
+            ]]>
+        </value>
+    </sql>
+
+</sqltoy>

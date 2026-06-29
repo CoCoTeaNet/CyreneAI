@@ -97,7 +97,24 @@ INSERT INTO ai_embedding_model (id, provider_type, model_name, api_key, api_base
 INSERT INTO sys_menu (id, menu_name, permission_code, router_path, parent_id, menu_type, is_menu, menu_status, component_path, is_external_link, icon_path, sort, create_by, create_time, update_by, update_time, is_deleted, revision) VALUES
 (1810000000000002006, 'Embedding Model', ':ai:embedding-model', '/admin/ai-embedding-model', 1810000000000002000, 1, 1, 0, '', 0, 'Connection', 6, 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL);
 
--- Assign AI menus to Super Administrator role
+-- Phase 4: Built-in tools initial data
+INSERT INTO ai_tool (id, name, description, type, schema_json, url, auth_type, auth_value, http_method, builtin_handler, enable_status, sort, create_by, create_time, update_by, update_time, is_deleted, revision) VALUES
+(1820000000000000001, 'calculator', '执行数学表达式计算，支持 +, -, *, /, ^, sin, cos, tan, sqrt, log 等运算', 'builtin', NULL, NULL, NULL, NULL, NULL, 'calculator', 1, 1, 1699771308310499328, NOW(), NULL, NULL, 0, NULL),
+(1820000000000000002, 'datetime', '获取当前日期、时间或时间戳', 'builtin', NULL, NULL, NULL, NULL, NULL, 'datetime', 1, 2, 1699771308310499328, NOW(), NULL, NULL, 0, NULL),
+(1820000000000000003, 'web_search', '通过网络搜索引擎搜索实时信息', 'builtin', NULL, NULL, NULL, NULL, NULL, 'web_search', 1, 3, 1699771308310499328, NOW(), NULL, NULL, 0, NULL),
+(1820000000000000004, 'knowledge_base', '从知识库中检索相关信息，用于回答基于私有文档的问题', 'builtin', NULL, NULL, NULL, NULL, NULL, 'knowledge_base', 1, 4, 1699771308310499328, NOW(), NULL, NULL, 0, NULL),
+(1820000000000000005, 'code_execution', '执行简单的 JavaScript 代码片段并返回结果（沙箱环境）', 'builtin', NULL, NULL, NULL, NULL, NULL, 'code_execution', 1, 5, 1699771308310499328, NOW(), NULL, NULL, 0, NULL),
+(1820000000000000006, 'image_generation', '根据文字描述生成图片（需要配置 API 密钥）', 'builtin', NULL, NULL, NULL, NULL, NULL, 'image_generation', 1, 6, 1699771308310499328, NOW(), NULL, NULL, 0, NULL),
+(1820000000000000007, 'image_recognition', '识别图片内容，支持读取图片中的文字、物体、场景等（需要配置 API 密钥）', 'builtin', NULL, NULL, NULL, NULL, NULL, 'image_recognition', 1, 7, 1699771308310499328, NOW(), NULL, NULL, 0, NULL),
+(1820000000000000008, 'weather', '查询指定城市的当前天气和天气预报信息', 'builtin', NULL, NULL, NULL, NULL, NULL, 'weather', 1, 8, 1699771308310499328, NOW(), NULL, NULL, 0, NULL);
+
+-- Agent/Tool management menus
+INSERT INTO sys_menu (id, menu_name, permission_code, router_path, parent_id, menu_type, is_menu, menu_status, component_path, is_external_link, icon_path, sort, create_by, create_time, update_by, update_time, is_deleted, revision) VALUES
+(1820000000000001001, 'Tool Management', ':ai:tool', '/admin/ai-tool', 1810000000000002000, 1, 1, 0, '', 0, 'Tools', 7, 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL),
+(1820000000000001002, 'Agent Management', ':ai:agent', '/admin/ai-agent', 1810000000000002000, 1, 1, 0, '', 0, 'UserFilled', 8, 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL),
+(1820000000000001003, 'Agent Chat', ':ai:agent-chat', '/admin/ai-agent-chat', 1810000000000002000, 1, 1, 0, '', 0, 'ChatDotSquare', 9, 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL);
+
+-- Assign new menus to Super Administrator role
 INSERT INTO sys_role_menu (id, role_id, menu_id) VALUES
 (1810000000000002006, 1699771910151151616, 1810000000000002000),
 (1810000000000002007, 1699771910151151616, 1810000000000002001),
@@ -105,4 +122,7 @@ INSERT INTO sys_role_menu (id, role_id, menu_id) VALUES
 (1810000000000002009, 1699771910151151616, 1810000000000002003),
 (1810000000000002010, 1699771910151151616, 1810000000000002004),
 (1810000000000002011, 1699771910151151616, 1810000000000002005),
-(1810000000000002020, 1699771910151151616, 1810000000000002006);
+(1810000000000002020, 1699771910151151616, 1810000000000002006),
+(1820000000000002001, 1699771910151151616, 1820000000000001001),
+(1820000000000002002, 1699771910151151616, 1820000000000001002),
+(1820000000000002003, 1699771910151151616, 1820000000000001003);

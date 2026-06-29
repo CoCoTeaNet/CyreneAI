@@ -111,30 +111,33 @@
 ## 🤖 Phase 4 — Agent / 工具调用
 
 ### 4.1 Function Calling 基础
-- [ ] 工具定义 Schema 接口（`ToolSpecification`）
-- [ ] 支持 OpenAI 风格 Function Calling
-- [ ] 支持 DashScope 工具调用
+- [x] 工具定义 Schema 接口（`ToolSpecification`） ✔
+- [x] 文本函数调用协议（JSON-based，兼容所有供应商） ✔
+- [x] 支持 OpenAI / Anthropic / Ollama / Gemini / DashScope / 自定义 ✔
+- [x] `ToolExecutor` 接口 + 反射自动注册 ✔
+- [x] `ToolSpecification` 定义工具 Schema ✔
 
 ### 4.2 内置工具
-- [ ] **计算器**（执行数学表达式）
-- [ ] **当前时间/日期**
-- [ ] **网页搜索**（通过 Search API）
-- [ ] **知识库检索**（调用 RAG 能力）
-- [ ] **代码执行**（沙箱 Python/JS 运行）
-- [ ] **图片生成**（调用 Phase 5 图文生成，支持配置多模态模型如 DALL-E 3、Stable Diffusion、GPT-4o 等）
-- [ ] **图片识别**（调用多模态模型如 GPT-4V、Qwen-VL、Claude 3 等，可配置）
-- [ ] **天气查询**
+- [x] **计算器**（数学表达式求值，内置解析器，兼容 GraalVM JS） ✔
+- [x] **当前时间/日期**（时区感知） ✔
+- [x] **网页搜索**（Google / Bing Search API） ✔
+- [x] **知识库检索**（调用 RAG 能力） ✔
+- [x] **代码执行**（JavaScript 沙箱，支持 GraalVM JS） ✔
+- [x] **图片生成**（DALL-E 3） ✔
+- [x] **图片识别**（GPT-4V / GPT-4o） ✔
+- [x] **天气查询**（wttr.in） ✔
 
 ### 4.3 自定义工具
-- [ ] `ai_tool` 表：name, description, schema(json), url, auth_type
-- [ ] 用户可注册自定义 API 作为工具
-- [ ] 工具测试沙盒
+- [x] `ai_tool` 表：name, description, schema(json), url, auth_type, http_method ✔
+- [x] 用户可注册自定义 API 作为工具（支持 Bearer / Basic 认证） ✔
+- [x] 工具管理 CRUD 页面（含测试沙箱） ✔
 
 ### 4.4 Agent 编排
-- [ ] ReAct 模式 Agent 循环
-- [ ] `ai_agent` 表：name, description, model_id, tools[], system_prompt
-- [ ] 多 Agent 协作（Agent Orchestrator）
-- [ ] Agent 运行日志与监控
+- [x] ReAct 模式 Agent 循环（SSE 流式） ✔
+- [x] `ai_agent` 表：name, description, model_id, tools[], system_prompt, max_iterations ✔
+- [x] Agent 运行日志与 Token 用量统计（`ai_agent_log` 表） ✔
+- [x] Agent 管理 CRUD 页面（关联工具） ✔
+- [x] Agent Chat UI（SSE 流式：thinking → tool_call → tool_result → content） ✔
 
 ---
 
