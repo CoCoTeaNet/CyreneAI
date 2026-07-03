@@ -16,6 +16,9 @@ public class AiModelAddDTO implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 
+    @NotBlank(message = "模型类型不能为空")
+    private String modelType;
+
     @NotNull(message = "提供商不能为空")
     private String providerId;
 
@@ -27,6 +30,12 @@ public class AiModelAddDTO implements Serializable {
     private BigDecimal inputPrice;
 
     private BigDecimal outputPrice;
+
+    private Integer dimension;
+
+    private String defaultSize;
+
+    private String defaultVoice;
 
     private Integer isDefault;
 

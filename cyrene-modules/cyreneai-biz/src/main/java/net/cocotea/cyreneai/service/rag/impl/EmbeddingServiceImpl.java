@@ -7,7 +7,10 @@ import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.openai.OpenAiEmbeddingModel;
 import lombok.extern.slf4j.Slf4j;
-import net.cocotea.cyreneai.model.po.AiEmbeddingModel;
+import net.cocotea.cyreneai.model.dto.AiEmbeddingModelAddDTO;
+import net.cocotea.cyreneai.model.dto.AiEmbeddingModelPageDTO;
+import net.cocotea.cyreneai.model.dto.AiEmbeddingModelUpdateDTO;
+import net.cocotea.cyreneai.model.po.AiModel;
 import net.cocotea.cyreneai.model.po.AiModelProvider;
 import net.cocotea.cyreneai.model.vo.AiEmbeddingModelVO;
 import net.cocotea.cyreneai.service.rag.EmbeddingService;
@@ -33,14 +36,14 @@ public class EmbeddingServiceImpl implements EmbeddingService {
     private final Map<BigInteger, EmbeddingModel> modelCache = new ConcurrentHashMap<>();
 
     @Override
-    public Embedding embed(String text, AiEmbeddingModel model) {
+    public Embedding embed(String text, AiModel model) {
         EmbeddingModel embeddingModel = getOrCreateModel(model);
         if (embeddingModel == null) return null;
         return embeddingModel.embed(text).content();
     }
 
     @Override
-    public List<Embedding> embedBatch(List<String> texts, AiEmbeddingModel model) {
+    public List<Embedding> embedBatch(List<String> texts, AiModel model) {
         EmbeddingModel embeddingModel = getOrCreateModel(model);
         if (embeddingModel == null) return List.of();
         List<TextSegment> segments = texts.stream()
@@ -50,40 +53,73 @@ public class EmbeddingServiceImpl implements EmbeddingService {
     }
 
     @Override
-    public AiEmbeddingModel getDefaultEmbeddingModel() {
+    public AiModel getDefaultEmbeddingModel() {
         EntityQuery query = EntityQuery.create()
-                .where("is_default = 1 and enable_status = 1 and is_deleted = 0")
+                .where("model_type = 'embedding' and is_default = 1 and enable_status = 1 and is_deleted = 0")
                 .orderByDesc("sort");
-        List<AiEmbeddingModel> models = lightDao.findEntity(AiEmbeddingModel.class, query);
+        List<AiModel> models = lightDao.findEntity(AiModel.class, query);
         if (models.isEmpty()) {
             query = EntityQuery.create()
-                    .where("enable_status = 1 and is_deleted = 0")
+                    .where("model_type = 'embedding' and enable_status = 1 and is_deleted = 0")
                     .orderByDesc("sort");
-            models = lightDao.findEntity(AiEmbeddingModel.class, query);
+            models = lightDao.findEntity(AiModel.class, query);
         }
         return models.isEmpty() ? null : models.getFirst();
     }
 
     @Override
-    public AiEmbeddingModel getEmbeddingModelById(BigInteger id) {
-        return lightDao.load(new AiEmbeddingModel(id));
+    public AiModel getEmbeddingModelById(BigInteger id) {
+        return lightDao.load(new AiModel(id));
     }
 
     @Override
-    public boolean add(AiEmbeddingModel model) {
+    public boolean add(AiEmbeddingModelAddDTO dto) {
+        AiModel model = new AiModel();
+        model.setModelType("embedding");
+        if (dto.getProviderType() != null) {
+            List<AiModelProvider> providers = lightDao.findEntity(AiModelProvider.class,
+                    EntityQuery.create().where("provider_type = ? and is_deleted = 0")
+                            .values(dto.getProviderType()).orderByDesc("sort"));
+            if (!providers.isEmpty()) {
+                model.setProviderId(providers.getFirst().getId());
+            }
+        }
+        model.setModelName(dto.getModelName());
+        model.setDimension(dto.getDimension());
+        model.setIsDefault(dto.getIsDefault());
+        model.setEnableStatus(dto.getEnableStatus());
+        model.setSort(dto.getSort());
+        model.setRemark(dto.getRemark());
         return lightDao.save(model) != null;
     }
 
     @Override
-    public boolean update(AiEmbeddingModel model) {
+    public boolean update(AiEmbeddingModelUpdateDTO dto) {
+        AiModel model = new AiModel();
+        model.setId(dto.getId());
+        model.setModelType("embedding");
+        if (dto.getProviderType() != null) {
+            List<AiModelProvider> providers = lightDao.findEntity(AiModelProvider.class,
+                    EntityQuery.create().where("provider_type = ? and is_deleted = 0")
+                            .values(dto.getProviderType()).orderByDesc("sort"));
+            if (!providers.isEmpty()) {
+                model.setProviderId(providers.getFirst().getId());
+            }
+        }
+        model.setModelName(dto.getModelName());
+        model.setDimension(dto.getDimension());
+        model.setIsDefault(dto.getIsDefault());
+        model.setEnableStatus(dto.getEnableStatus());
+        model.setSort(dto.getSort());
+        model.setRemark(dto.getRemark());
         Long updated = lightDao.update(model);
-        modelCache.remove(model.getId());
+        modelCache.remove(dto.getId());
         return updated != null && updated > 0;
     }
 
     @Override
     public boolean delete(BigInteger id) {
-        AiEmbeddingModel model = new AiEmbeddingModel(id);
+        AiModel model = new AiModel(id);
         model.setIsDeleted(1);
         Long updated = lightDao.update(model);
         modelCache.remove(id);
@@ -91,33 +127,30 @@ public class EmbeddingServiceImpl implements EmbeddingService {
     }
 
     @Override
-    public ApiPage<AiEmbeddingModelVO> listByPage(AiEmbeddingModel query, int pageNo, int pageSize) {
+    public ApiPage<AiEmbeddingModelVO> listByPage(AiEmbeddingModelPageDTO pageDTO) {
+        AiEmbeddingModelPageDTO.Query q = pageDTO.getEmbeddingModel();
         Map<String, Object> params = MapUtil.newHashMap(3);
-        params.put("providerType", query.getProviderType());
-        params.put("modelName", query.getModelName());
-        params.put("enableStatus", query.getEnableStatus());
+        params.put("providerType", q != null ? q.getProviderType() : null);
+        params.put("modelName", q != null ? q.getModelName() : null);
+        params.put("enableStatus", q != null ? q.getEnableStatus() : null);
         Page<AiEmbeddingModelVO> pageParam = new Page<>();
-        pageParam.setPageNo(pageNo);
-        pageParam.setPageSize(pageSize);
-        Page<AiEmbeddingModelVO> page = lightDao.findPage(
-                pageParam,
-                "ai_embedding_model_findList",
-                params,
-                AiEmbeddingModelVO.class
-        );
+        pageParam.setPageNo(pageDTO.getPageNo());
+        pageParam.setPageSize(pageDTO.getPageSize());
+        Page<AiEmbeddingModelVO> page = lightDao.findPage(pageParam, "ai_embedding_model_findList", params, AiEmbeddingModelVO.class);
         return ApiPage.rest(page);
     }
 
     @Override
     public List<AiEmbeddingModelVO> listEnabled() {
         EntityQuery eq = EntityQuery.create()
-                .where("enable_status = 1 and is_deleted = 0")
+                .where("model_type = 'embedding' and enable_status = 1 and is_deleted = 0")
                 .orderByDesc("sort");
-        return lightDao.findEntity(AiEmbeddingModel.class, eq).stream()
+        return lightDao.findEntity(AiModel.class, eq).stream()
                 .map(m -> {
                     AiEmbeddingModelVO vo = new AiEmbeddingModelVO();
                     vo.setId(m.getId());
-                    vo.setProviderType(m.getProviderType());
+                    AiModelProvider provider = lightDao.load(new AiModelProvider(m.getProviderId()));
+                    vo.setProviderType(provider != null ? provider.getProviderType() : null);
                     vo.setModelName(m.getModelName());
                     vo.setDimension(m.getDimension());
                     vo.setIsDefault(m.getIsDefault());
@@ -128,27 +161,18 @@ public class EmbeddingServiceImpl implements EmbeddingService {
                 }).toList();
     }
 
-    private EmbeddingModel getOrCreateModel(AiEmbeddingModel model) {
+    private EmbeddingModel getOrCreateModel(AiModel model) {
         if (model == null) return null;
         return modelCache.computeIfAbsent(model.getId(), k -> buildEmbeddingModel(model));
     }
 
-    private EmbeddingModel buildEmbeddingModel(AiEmbeddingModel model) {
-        String type = model.getProviderType();
-        String apiKey = model.getApiKey();
-        String baseUrl = model.getApiBaseUrl();
+    private EmbeddingModel buildEmbeddingModel(AiModel model) {
+        AiModelProvider provider = lightDao.load(new AiModelProvider(model.getProviderId()));
+        String type = provider.getProviderType();
+        String apiKey = provider.getApiKey();
+        String baseUrl = provider.getApiBaseUrl();
         String modelName = model.getModelName();
 
-        if (apiKey == null || apiKey.isBlank()) {
-            List<AiModelProvider> providers = lightDao.findEntity(AiModelProvider.class,
-                    EntityQuery.create().where("provider_type = ? and enable_status = 1 and is_deleted = 0")
-                            .values(type).orderByDesc("sort"));
-            if (!providers.isEmpty()) {
-                AiModelProvider provider = providers.getFirst();
-                if (apiKey == null || apiKey.isBlank()) apiKey = provider.getApiKey();
-                if (baseUrl == null || baseUrl.isBlank()) baseUrl = provider.getApiBaseUrl();
-            }
-        }
         if (apiKey == null) apiKey = "";
 
         return switch (type.toLowerCase()) {

@@ -6,7 +6,10 @@ import dev.langchain4j.community.model.dashscope.QwenChatModel;
 import dev.langchain4j.community.model.dashscope.QwenStreamingChatModel;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.Content;
+import dev.langchain4j.data.message.ImageContent;
 import dev.langchain4j.data.message.SystemMessage;
+import dev.langchain4j.data.message.TextContent;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
@@ -23,6 +26,7 @@ import dev.langchain4j.model.googleai.GoogleAiGeminiStreamingChatModel;
 import lombok.extern.slf4j.Slf4j;
 import net.cocotea.cyreneai.model.dto.ChatRequestDTO;
 import net.cocotea.cyreneai.model.dto.ChatRequestDTO.ChatMessageDTO;
+import net.cocotea.cyreneai.model.dto.ChatRequestDTO.ContentPart;
 import net.cocotea.cyreneai.model.po.AiConversation;
 import net.cocotea.cyreneai.model.po.AiModel;
 import net.cocotea.cyreneai.model.po.AiModelProvider;
@@ -403,7 +407,29 @@ public class ChatController {
         }
         if (dtos == null) return messages;
         for (ChatMessageDTO dto : dtos) {
-            if (dto.getContent() == null || dto.getContent().isBlank()) continue;
+            if (dto.getContent() == null || dto.getContent().isBlank()) {
+                if (dto.getContentParts() == null || dto.getContentParts().isEmpty()) continue;
+            }
+            if (dto.getContentParts() != null && !dto.getContentParts().isEmpty()) {
+                List<Content> contents = new ArrayList<>();
+                boolean hasImage = false;
+                for (ContentPart part : dto.getContentParts()) {
+                    if ("text".equals(part.getType())) {
+                        contents.add(new TextContent(part.getText()));
+                    } else if ("image_url".equals(part.getType())) {
+                        String url = part.getImageUrl();
+                        if (url != null && !url.isBlank()) {
+                            contents.add(ImageContent.from(url));
+                            hasImage = true;
+                        }
+                    }
+                }
+                if (!contents.isEmpty()) {
+                    messages.add(new UserMessage(contents));
+                    continue;
+                }
+                if (!hasImage) continue;
+            }
             messages.add(switch (dto.getRole()) {
                 case "system" -> new SystemMessage(dto.getContent());
                 case "assistant" -> new AiMessage(dto.getContent());

@@ -57,12 +57,7 @@ public class AiToolServiceImpl implements AiToolService {
         map.put("type", query != null ? query.getType() : null);
         map.put("builtinHandler", query != null ? query.getBuiltinHandler() : null);
         map.put("enableStatus", query != null ? query.getEnableStatus() : null);
-        Page<AiToolVO> page = lightDao.findPage(
-                ApiPage.create(pageDTO),
-                "ai_tool_findList",
-                map,
-                AiToolVO.class
-        );
+        Page<AiToolVO> page = lightDao.findPage(ApiPage.create(pageDTO), "ai_tool_findList", map, AiToolVO.class);
         return ApiPage.rest(page);
     }
 

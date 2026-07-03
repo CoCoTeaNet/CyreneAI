@@ -56,20 +56,25 @@ INSERT INTO sys_user_role (id,user_id,role_id) VALUES
 
 -- AI model provider initial data
 INSERT INTO ai_model_provider (id, provider_name, provider_type, api_base_url, api_key, sort, enable_status, remark, create_by, create_time, update_by, update_time, is_deleted, revision) VALUES
-(1810000000000000001, 'DashScope', 'dashscope', 'https://dashscope.aliyuncs.com/api/v1', '', 1, 1, 'Aliyun DashScope official API', 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL);
+(1810000000000000001, 'DashScope', 'dashscope', 'https://dashscope.aliyuncs.com/api/v1', '', 1, 1, 'Aliyun DashScope official API', 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL),
+(1810000000000000002, 'OpenAI', 'openai', 'https://api.openai.com', '', 2, 1, 'OpenAI official API', 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL);
 
--- AI model initial data
-INSERT INTO ai_model (id, provider_id, model_name, context_window, input_price, output_price, is_default, sort, enable_status, remark, create_by, create_time, update_by, update_time, is_deleted, revision) VALUES
-(1810000000000001001, 1810000000000000001, 'qwen-turbo', 131072, 0.0003, 0.0006, 0, 1, 1, 'Qwen Turbo', 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL);
-
-INSERT INTO ai_model (id, provider_id, model_name, context_window, input_price, output_price, is_default, sort, enable_status, remark, create_by, create_time, update_by, update_time, is_deleted, revision) VALUES
-(1810000000000001002, 1810000000000000001, 'qwen-plus', 131072, 0.0004, 0.0012, 1, 2, 1, 'Qwen Plus', 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL);
-
-INSERT INTO ai_model (id, provider_id, model_name, context_window, input_price, output_price, is_default, sort, enable_status, remark, create_by, create_time, update_by, update_time, is_deleted, revision) VALUES
-(1810000000000001003, 1810000000000000001, 'qwen-max', 131072, 0.002, 0.006, 0, 3, 1, 'Qwen Max', 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL);
-
-INSERT INTO ai_model (id, provider_id, model_name, context_window, input_price, output_price, is_default, sort, enable_status, remark, create_by, create_time, update_by, update_time, is_deleted, revision) VALUES
-(1810000000000001004, 1810000000000000001, 'qwen3.7-plus', 131072, 0.005, 0.02, 0, 4, 1, 'Qwen3.7 Plus', 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL);
+-- AI model initial data (unified with model_type)
+INSERT INTO ai_model (id, model_type, provider_id, model_name, context_window, input_price, output_price, dimension, default_size, default_voice, is_default, sort, enable_status, remark, create_by, create_time, update_by, update_time, is_deleted, revision) VALUES
+(1810000000000001001, 'chat', 1810000000000000001, 'qwen-turbo', 131072, 0.0003, 0.0006, NULL, NULL, NULL, 0, 1, 1, 'Qwen Turbo', 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL),
+(1810000000000001002, 'chat', 1810000000000000001, 'qwen-plus', 131072, 0.0004, 0.0012, NULL, NULL, NULL, 1, 2, 1, 'Qwen Plus', 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL),
+(1810000000000001003, 'chat', 1810000000000000001, 'qwen-max', 131072, 0.002, 0.006, NULL, NULL, NULL, 0, 3, 1, 'Qwen Max', 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL),
+(1810000000000001004, 'chat', 1810000000000000001, 'qwen3.7-plus', 131072, 0.005, 0.02, NULL, NULL, NULL, 0, 4, 1, 'Qwen3.7 Plus', 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL),
+-- embedding models
+(1810000000000003001, 'embedding', 1810000000000000001, 'text-embedding-v3', NULL, NULL, NULL, 1024, NULL, NULL, 1, 1, 1, 'DashScope text-embedding-v3 (default)', 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL),
+-- image models
+(1830000000000002001, 'image', 1810000000000000002, 'dall-e-3', NULL, NULL, NULL, NULL, '1024x1024', NULL, 1, 1, 1, 'OpenAI DALL-E 3 (default)', 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL),
+-- vision models
+(1830000000000003001, 'vision', 1810000000000000002, 'gpt-4o', NULL, NULL, NULL, NULL, NULL, NULL, 1, 1, 1, 'OpenAI GPT-4o (default)', 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL),
+-- tts models
+(1830000000000004001, 'tts', 1810000000000000002, 'tts-1', NULL, NULL, NULL, NULL, NULL, 'alloy', 1, 1, 1, 'OpenAI TTS-1 (default)', 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL),
+-- stt models
+(1830000000000005001, 'stt', 1810000000000000002, 'whisper-1', NULL, NULL, NULL, NULL, NULL, NULL, 1, 1, 1, 'OpenAI Whisper-1 (default)', 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL);
 
 -- AI module menus
 INSERT INTO sys_menu (id, menu_name, permission_code, router_path, parent_id, menu_type, is_menu, menu_status, component_path, is_external_link, icon_path, sort, create_by, create_time, update_by, update_time, is_deleted, revision) VALUES
@@ -90,9 +95,6 @@ INSERT INTO sys_menu (id, menu_name, permission_code, router_path, parent_id, me
 INSERT INTO sys_menu (id, menu_name, permission_code, router_path, parent_id, menu_type, is_menu, menu_status, component_path, is_external_link, icon_path, sort, create_by, create_time, update_by, update_time, is_deleted, revision) VALUES
 (1810000000000002005, 'Knowledge Base', ':ai:knowledge-base', '/admin/ai-knowledge-base', 1810000000000002000, 1, 1, 0, '', 0, 'Collection', 5, 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL);
 
--- AI embedding model initial data
-INSERT INTO ai_embedding_model (id, provider_type, model_name, api_key, api_base_url, dimension, is_default, enable_status, sort, remark, create_by, create_time, update_by, update_time, is_deleted, revision) VALUES
-(1810000000000003001, 'dashscope', 'text-embedding-v3', '', NULL, 1024, 1, 1, 1, 'DashScope text-embedding-v3 (default)', 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL);
 
 INSERT INTO sys_menu (id, menu_name, permission_code, router_path, parent_id, menu_type, is_menu, menu_status, component_path, is_external_link, icon_path, sort, create_by, create_time, update_by, update_time, is_deleted, revision) VALUES
 (1810000000000002006, 'Embedding Model', ':ai:embedding-model', '/admin/ai-embedding-model', 1810000000000002000, 1, 1, 0, '', 0, 'Connection', 6, 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL);
@@ -114,6 +116,12 @@ INSERT INTO sys_menu (id, menu_name, permission_code, router_path, parent_id, me
 (1820000000000001002, 'Agent Management', ':ai:agent', '/admin/ai-agent', 1810000000000002000, 1, 1, 0, '', 0, 'UserFilled', 8, 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL),
 (1820000000000001003, 'Agent Chat', ':ai:agent-chat', '/admin/ai-agent-chat', 1810000000000002000, 1, 1, 0, '', 0, 'ChatDotSquare', 9, 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL);
 
+-- Phase 5: Multi-modal menus
+INSERT INTO sys_menu (id, menu_name, permission_code, router_path, parent_id, menu_type, is_menu, menu_status, component_path, is_external_link, icon_path, sort, create_by, create_time, update_by, update_time, is_deleted, revision) VALUES
+(18302300000001001, 'Image Generation', ':ai:image-generation', '/admin/ai-image', 1810000000000002000, 1, 1, 0, '', 0, 'Picture', 10, 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL),
+(18302300000001003, 'TTS', ':ai:tts', '/admin/ai-tts', 1810000000000002000, 1, 1, 0, '', 0, 'Microphone', 12, 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL),
+(18302300000001004, 'STT', ':ai:stt', '/admin/ai-stt', 1810000000000002000, 1, 1, 0, '', 0, 'Headset', 13, 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL),
+
 -- Assign new menus to Super Administrator role
 INSERT INTO sys_role_menu (id, role_id, menu_id) VALUES
 (1810000000000002006, 1699771910151151616, 1810000000000002000),
@@ -125,4 +133,6 @@ INSERT INTO sys_role_menu (id, role_id, menu_id) VALUES
 (1810000000000002020, 1699771910151151616, 1810000000000002006),
 (1820000000000002001, 1699771910151151616, 1820000000000001001),
 (1820000000000002002, 1699771910151151616, 1820000000000001002),
-(1820000000000002003, 1699771910151151616, 1820000000000001003);
+(18200700000002003, 1699771910151151616, 18302300000001001),
+(18300700000006002, 1699771910151151616, 18302300000001003),
+(18300700000006003, 1699771910151151616, 18302300000001004),;

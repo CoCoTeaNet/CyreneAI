@@ -22,6 +22,9 @@ public class AiModel implements Serializable {
     @Column(name = "id", comment = "模型id", length = 19L, type = java.sql.Types.BIGINT, nullable = false)
     private BigInteger id;
 
+    @Column(name = "model_type", comment = "模型类型;chat, image, vision, tts, stt, embedding", length = 20L, type = java.sql.Types.VARCHAR, nullable = false)
+    private String modelType;
+
     @Column(name = "provider_id", comment = "提供商id", length = 19L, type = java.sql.Types.BIGINT, nullable = false)
     private BigInteger providerId;
 
@@ -36,6 +39,15 @@ public class AiModel implements Serializable {
 
     @Column(name = "output_price", comment = "输出价格(每千token)", length = 10L, type = java.sql.Types.DECIMAL, nullable = true)
     private BigDecimal outputPrice;
+
+    @Column(name = "dimension", comment = "向量维度(仅embedding模型)", length = 10L, type = java.sql.Types.INTEGER, nullable = true)
+    private Integer dimension;
+
+    @Column(name = "default_size", comment = "默认图片尺寸(仅image模型)", length = 20L, type = java.sql.Types.VARCHAR, nullable = true)
+    private String defaultSize;
+
+    @Column(name = "default_voice", comment = "默认音色(仅tts模型)", length = 50L, type = java.sql.Types.VARCHAR, nullable = true)
+    private String defaultVoice;
 
     @Column(name = "is_default", comment = "是否默认;0否 1是", length = 3L, defaultValue = "0", type = java.sql.Types.TINYINT, nullable = true)
     private Integer isDefault;

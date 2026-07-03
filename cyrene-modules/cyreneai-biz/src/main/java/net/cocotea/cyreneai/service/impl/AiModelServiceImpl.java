@@ -52,16 +52,12 @@ public class AiModelServiceImpl implements AiModelService {
     @Override
     public ApiPage<AiModelVO> listByPage(AiModelPageDTO pageDTO) {
         AiModelPageDTO.Query query = pageDTO.getAiModel();
-        Map<String, Object> map = MapUtil.newHashMap(3);
+        Map<String, Object> map = MapUtil.newHashMap(4);
+        map.put("modelType", query != null ? query.getModelType() : null);
         map.put("providerId", query != null ? query.getProviderId() : null);
         map.put("modelName", query != null ? query.getModelName() : null);
         map.put("enableStatus", query != null ? query.getEnableStatus() : null);
-        Page<AiModelVO> page = lightDao.findPage(
-                ApiPage.create(pageDTO),
-                "ai_model_findList",
-                map,
-                AiModelVO.class
-        );
+        Page<AiModelVO> page = lightDao.findPage(ApiPage.create(pageDTO), "ai_model_findList", map, AiModelVO.class);
         return ApiPage.rest(page);
     }
 

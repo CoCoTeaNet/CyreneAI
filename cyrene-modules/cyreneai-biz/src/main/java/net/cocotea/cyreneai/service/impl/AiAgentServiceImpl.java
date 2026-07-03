@@ -65,12 +65,7 @@ public class AiAgentServiceImpl implements AiAgentService {
         Map<String, Object> map = MapUtil.newHashMap(2);
         map.put("name", query != null ? query.getName() : null);
         map.put("enableStatus", query != null ? query.getEnableStatus() : null);
-        Page<AiAgentVO> page = lightDao.findPage(
-                ApiPage.create(pageDTO),
-                "ai_agent_findList",
-                map,
-                AiAgentVO.class
-        );
+        Page<AiAgentVO> page = lightDao.findPage(ApiPage.create(pageDTO), "ai_agent_findList", map, AiAgentVO.class);
         // Enrich with tool details
         for (AiAgentVO vo : page.getRows()) {
             enrichAgentVO(vo);

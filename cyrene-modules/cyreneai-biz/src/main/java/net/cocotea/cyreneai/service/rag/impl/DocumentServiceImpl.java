@@ -7,8 +7,8 @@ import lombok.extern.slf4j.Slf4j;
 import net.cocotea.cyreneai.model.po.AiDocument;
 import net.cocotea.cyreneai.model.vo.AiDocumentVO;
 import net.cocotea.cyreneai.model.po.AiDocumentChunk;
-import net.cocotea.cyreneai.model.po.AiEmbeddingModel;
 import net.cocotea.cyreneai.model.po.AiKbDocument;
+import net.cocotea.cyreneai.model.po.AiModel;
 import net.cocotea.cyreneai.service.rag.DocumentService;
 import net.cocotea.cyreneai.service.rag.EmbeddingService;
 import net.cocotea.cyreneai.service.rag.TextSplitter;
@@ -121,7 +121,7 @@ public class DocumentServiceImpl implements DocumentService {
         List<String> chunks = TextSplitter.split(text, chunkStrategy, chunkSize, chunkOverlap);
         log.info("Document {} split into {} chunks", fileName, chunks.size());
 
-        AiEmbeddingModel embeddingModel = embeddingService.getDefaultEmbeddingModel();
+        AiModel embeddingModel = embeddingService.getDefaultEmbeddingModel();
         if (embeddingModel == null) {
             doc.setStatus(3);
             doc.setErrorMsg("No embedding model configured");
@@ -253,12 +253,7 @@ public class DocumentServiceImpl implements DocumentService {
         Page<AiDocumentVO> pageParam = new Page<>();
         pageParam.setPageNo(pageNo);
         pageParam.setPageSize(pageSize);
-        Page<AiDocumentVO> page = lightDao.findPage(
-                pageParam,
-                "ai_document_findList",
-                params,
-                AiDocumentVO.class
-        );
+        Page<AiDocumentVO> page = lightDao.findPage(pageParam, "ai_document_findList", params, AiDocumentVO.class);
         return ApiPage.rest(page);
     }
 

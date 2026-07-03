@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<sqltoy xmlns="http://www.sagframe.com/schema/sqltoy"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.sagframe.com/schema/sqltoy http://www.sagframe.com/schema/sqltoy/sqltoy.xsd">
+
+    <sql id="ai_image_model_findList">
+        <value>
+            <![CDATA[
+            select m.id, p.provider_type, m.model_name, p.api_key, p.api_base_url,
+                   m.default_size, m.is_default, m.enable_status, m.sort, m.remark,
+                   m.create_by, m.create_time, m.update_by, m.update_time, m.is_deleted, m.revision
+            from ai_model m
+            left join ai_model_provider p on p.id = m.provider_id
+            where m.is_deleted=0 and m.model_type = 'image'
+            #[and p.provider_type = :providerType]
+            #[and m.model_name like :modelName]
+            #[and m.enable_status = :enableStatus]
+            order by m.sort desc, m.id desc
+            ]]>
+        </value>
+    </sql>
+
+</sqltoy>

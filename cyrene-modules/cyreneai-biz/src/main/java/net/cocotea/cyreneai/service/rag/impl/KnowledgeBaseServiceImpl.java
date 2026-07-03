@@ -6,8 +6,8 @@ import dev.langchain4j.data.embedding.Embedding;
 import lombok.extern.slf4j.Slf4j;
 import net.cocotea.cyreneai.model.po.AiDocument;
 import net.cocotea.cyreneai.model.po.AiDocumentChunk;
-import net.cocotea.cyreneai.model.po.AiEmbeddingModel;
 import net.cocotea.cyreneai.model.po.AiKbDocument;
+import net.cocotea.cyreneai.model.po.AiModel;
 import net.cocotea.cyreneai.model.po.AiKnowledgeBase;
 import net.cocotea.cyreneai.model.vo.AiKnowledgeBaseVO;
 import net.cocotea.cyreneai.model.vo.AiRetrievalResultVO;
@@ -115,7 +115,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         double threshold = similarityThreshold != null ? similarityThreshold :
                 (kb.getSimilarityThreshold() != null ? kb.getSimilarityThreshold().doubleValue() : 0.7);
 
-        AiEmbeddingModel embeddingModel;
+        AiModel embeddingModel;
         if (kb.getEmbeddingModelId() != null) {
             embeddingModel = embeddingService.getEmbeddingModelById(kb.getEmbeddingModelId());
         } else {

@@ -2,11 +2,9 @@ package net.cocotea.cyreneai.controller.rag;
 
 import cn.dev33.satoken.annotation.SaCheckRole;
 import cn.dev33.satoken.annotation.SaMode;
-import cn.hutool.core.bean.BeanUtil;
 import net.cocotea.cyreneai.model.dto.AiEmbeddingModelAddDTO;
 import net.cocotea.cyreneai.model.dto.AiEmbeddingModelPageDTO;
 import net.cocotea.cyreneai.model.dto.AiEmbeddingModelUpdateDTO;
-import net.cocotea.cyreneai.model.po.AiEmbeddingModel;
 import net.cocotea.cyreneai.model.vo.AiEmbeddingModelVO;
 import net.cocotea.cyreneai.service.rag.EmbeddingService;
 import net.cocotea.cyreneadmin.model.ApiPage;
@@ -36,8 +34,7 @@ public class EmbeddingModelController {
     @Mapping("/add")
     @SaCheckRole(value = {"role:super:admin", "role:simple:admin"}, mode = SaMode.OR)
     public ApiResult<Boolean> add(@Validated @Body AiEmbeddingModelAddDTO param) {
-        AiEmbeddingModel model = BeanUtil.copyProperties(param, AiEmbeddingModel.class);
-        boolean b = embeddingService.add(model);
+        boolean b = embeddingService.add(param);
         return ApiResult.ok(b);
     }
 
@@ -45,8 +42,7 @@ public class EmbeddingModelController {
     @Mapping("/update")
     @SaCheckRole(value = {"role:super:admin", "role:simple:admin"}, mode = SaMode.OR)
     public ApiResult<Boolean> update(@Validated @Body AiEmbeddingModelUpdateDTO param) {
-        AiEmbeddingModel model = BeanUtil.copyProperties(param, AiEmbeddingModel.class);
-        boolean b = embeddingService.update(model);
+        boolean b = embeddingService.update(param);
         return ApiResult.ok(b);
     }
 
@@ -61,15 +57,7 @@ public class EmbeddingModelController {
     @Post
     @Mapping("/listByPage")
     public ApiResult<ApiPage<AiEmbeddingModelVO>> listByPage(@Validated @Body AiEmbeddingModelPageDTO pageDTO) {
-        AiEmbeddingModelPageDTO.Query q = pageDTO.getEmbeddingModel();
-        AiEmbeddingModel query = new AiEmbeddingModel();
-        if (q != null) {
-            query.setProviderType(q.getProviderType());
-            query.setModelName(q.getModelName());
-            query.setEnableStatus(q.getEnableStatus());
-        }
-        ApiPage<AiEmbeddingModelVO> p = embeddingService.listByPage(query,
-                pageDTO.getPageNo(), pageDTO.getPageSize());
+        ApiPage<AiEmbeddingModelVO> p = embeddingService.listByPage(pageDTO);
         return ApiResult.ok(p);
     }
 

@@ -1,7 +1,10 @@
 package net.cocotea.cyreneai.service.rag;
 
 import dev.langchain4j.data.embedding.Embedding;
-import net.cocotea.cyreneai.model.po.AiEmbeddingModel;
+import net.cocotea.cyreneai.model.dto.AiEmbeddingModelAddDTO;
+import net.cocotea.cyreneai.model.dto.AiEmbeddingModelPageDTO;
+import net.cocotea.cyreneai.model.dto.AiEmbeddingModelUpdateDTO;
+import net.cocotea.cyreneai.model.po.AiModel;
 import net.cocotea.cyreneai.model.vo.AiEmbeddingModelVO;
 import net.cocotea.cyreneadmin.model.ApiPage;
 
@@ -10,21 +13,21 @@ import java.util.List;
 
 public interface EmbeddingService {
 
-    Embedding embed(String text, AiEmbeddingModel model);
+    Embedding embed(String text, AiModel model);
 
-    List<Embedding> embedBatch(List<String> texts, AiEmbeddingModel model);
+    List<Embedding> embedBatch(List<String> texts, AiModel model);
 
-    AiEmbeddingModel getDefaultEmbeddingModel();
+    AiModel getDefaultEmbeddingModel();
 
-    AiEmbeddingModel getEmbeddingModelById(BigInteger id);
+    AiModel getEmbeddingModelById(BigInteger id);
 
-    boolean add(AiEmbeddingModel model);
+    boolean add(AiEmbeddingModelAddDTO dto);
 
-    boolean update(AiEmbeddingModel model);
+    boolean update(AiEmbeddingModelUpdateDTO dto);
 
     boolean delete(BigInteger id);
 
-    ApiPage<AiEmbeddingModelVO> listByPage(AiEmbeddingModel model, int pageNo, int pageSize);
+    ApiPage<AiEmbeddingModelVO> listByPage(AiEmbeddingModelPageDTO pageDTO);
 
     List<AiEmbeddingModelVO> listEnabled();
 }

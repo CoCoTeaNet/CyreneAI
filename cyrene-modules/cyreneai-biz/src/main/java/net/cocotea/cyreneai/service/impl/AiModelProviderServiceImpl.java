@@ -56,12 +56,7 @@ public class AiModelProviderServiceImpl implements AiModelProviderService {
         map.put("providerName", query != null ? query.getProviderName() : null);
         map.put("providerType", query != null ? query.getProviderType() : null);
         map.put("enableStatus", query != null ? query.getEnableStatus() : null);
-        Page<AiModelProviderVO> page = lightDao.findPage(
-                ApiPage.create(pageDTO),
-                "ai_model_provider_findList",
-                map,
-                AiModelProviderVO.class
-        );
+        Page<AiModelProviderVO> page = lightDao.findPage(ApiPage.create(pageDTO), "ai_model_provider_findList", map, AiModelProviderVO.class);
         return ApiPage.rest(page);
     }
 

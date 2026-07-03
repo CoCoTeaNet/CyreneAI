@@ -15,7 +15,7 @@
                    (select count(*) from ai_kb_document kd where kd.kb_id = kb.id) as document_count
             from ai_knowledge_base kb
             left join ai_model m on m.id = kb.model_id
-            left join ai_embedding_model em on em.id = kb.embedding_model_id
+            left join ai_model em on em.id = kb.embedding_model_id
             where kb.is_deleted=0
             #[and kb.name like :name]
             #[and kb.enable_status = :enableStatus]

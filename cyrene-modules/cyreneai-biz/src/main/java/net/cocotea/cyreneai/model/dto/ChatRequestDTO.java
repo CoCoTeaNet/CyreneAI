@@ -48,5 +48,23 @@ public class ChatRequestDTO implements Serializable {
         private String role;
 
         private String content;
+
+        private List<ContentPart> contentParts;
+    }
+
+    @Data
+    @Accessors(chain = true)
+    public static class ContentPart implements Serializable {
+
+        @Serial
+        private static final long serialVersionUID = 1L;
+
+        private String type;
+
+        private String text;
+
+        private String imageUrl;
+
+        private String detail;
     }
 }

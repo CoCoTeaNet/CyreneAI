@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<sqltoy xmlns="http://www.sagframe.com/schema/sqltoy"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.sagframe.com/schema/sqltoy http://www.sagframe.com/schema/sqltoy/sqltoy.xsd">
+
+    <sql id="ai_tts_record_findList">
+        <value>
+            <![CDATA[
+            select id, create_by, text, model_name, voice, audio_url,
+                   file_size, duration_seconds, cost, create_time, update_by, update_time
+            from ai_tts_record
+            order by create_time desc
+            ]]>
+        </value>
+    </sql>
+
+</sqltoy>

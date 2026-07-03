@@ -18,6 +18,8 @@ public class AiModelVO implements Serializable {
 
     private BigInteger id;
 
+    private String modelType;
+
     private BigInteger providerId;
 
     private String providerName;
@@ -29,6 +31,12 @@ public class AiModelVO implements Serializable {
     private BigDecimal inputPrice;
 
     private BigDecimal outputPrice;
+
+    private Integer dimension;
+
+    private String defaultSize;
+
+    private String defaultVoice;
 
     private Integer isDefault;
 

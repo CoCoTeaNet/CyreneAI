@@ -19,6 +19,10 @@ const AiEmbeddingModelView = () => import("@/views/ai/embedding-model/index.vue"
 const AiToolView = () => import("@/views/ai/tool/index.vue");
 const AiAgentView = () => import("@/views/ai/agent/index.vue");
 const AgentChatView = () => import("@/views/ai/agent-chat/index.vue");
+const AiImageView = () => import("@/views/ai/image/index.vue");
+const AiVisionModelView = () => import("@/views/ai/vision-model/index.vue");
+const AiSttView = () => import("@/views/ai/stt/index.vue");
+const AiTtsView = () => import("@/views/ai/tts/index.vue");
 
 
 export const routes = [
@@ -56,6 +60,10 @@ export const routes = [
             {path: 'ai-tool', meta: {title: '工具管理'}, name: 'AiToolView', component: AiToolView},
             {path: 'ai-agent', meta: {title: '智能体'}, name: 'AiAgentView', component: AiAgentView},
             {path: 'ai-agent-chat', meta: {title: '智能体对话'}, name: 'AgentChatView', component: AgentChatView},
+            {path: 'ai-image', meta: {title: '图片生成'}, name: 'AiImageView', component: AiImageView},
+            {path: 'ai-vision-model', meta: {title: '视觉模型'}, name: 'AiVisionModelView', component: AiVisionModelView},
+            {path: 'ai-stt', meta: {title: '语音转文字'}, name: 'AiSttView', component: AiSttView},
+            {path: 'ai-tts', meta: {title: '文本转语音'}, name: 'AiTtsView', component: AiTtsView},
         ]
     },
     {

@@ -4,6 +4,16 @@
       <el-form-item label="模型名称">
         <el-input placeholder="名称" v-model="pageParam.searchObject.modelName"/>
       </el-form-item>
+      <el-form-item label="模型类型">
+        <el-select placeholder="选择类型" style="width: 200px" v-model="pageParam.searchObject.modelType" clearable>
+          <el-option label="对话" value="chat"/>
+          <el-option label="文生图" value="image"/>
+          <el-option label="视觉" value="vision"/>
+          <el-option label="语音合成" value="tts"/>
+          <el-option label="语音识别" value="stt"/>
+          <el-option label="向量化" value="embedding"/>
+        </el-select>
+      </el-form-item>
       <el-form-item label="提供商">
         <el-select placeholder="选择提供商" style="width: 200px" v-model="pageParam.searchObject.providerId" filterable clearable>
           <el-option v-for="p in providerList" :key="p.id" :label="p.providerName" :value="p.id"/>
@@ -30,6 +40,11 @@
       <el-table v-loading="loading" :data="pageVo.records" style="width: 100%" @selection-change="handleSelectionChange">
         <el-table-column type="selection" width="55"/>
         <el-table-column prop="providerName" width="150" label="所属提供商"/>
+        <el-table-column prop="modelType" width="100" label="模型类型">
+          <template #default="scope">
+            <el-tag>{{ typeLabel(scope.row.modelType) }}</el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="modelName" width="200" label="模型名称"/>
         <el-table-column prop="contextWindow" width="120" label="上下文窗口"/>
         <el-table-column prop="inputPrice" width="120" label="输入价格"/>
@@ -72,6 +87,16 @@
           <el-form-item prop="providerId" label="所属提供商">
             <el-select v-model="editForm.providerId" placeholder="选择提供商" filterable style="width: 100%">
               <el-option v-for="p in providerList" :key="p.id" :label="p.providerName" :value="p.id"/>
+            </el-select>
+          </el-form-item>
+          <el-form-item prop="modelType" label="模型类型">
+            <el-select v-model="editForm.modelType" placeholder="选择模型类型" style="width: 100%">
+              <el-option label="对话" value="chat"/>
+              <el-option label="文生图" value="image"/>
+              <el-option label="视觉" value="vision"/>
+              <el-option label="语音合成" value="tts"/>
+              <el-option label="语音识别" value="stt"/>
+              <el-option label="向量化" value="embedding"/>
             </el-select>
           </el-form-item>
           <el-form-item prop="modelName" label="模型名称">
@@ -137,6 +162,7 @@ const editForm = ref<any>({enableStatus: 1, isDefault: 0, sort: 0});
 
 const rules = reactive({
   providerId: [{required: true, message: '请选择提供商', trigger: 'change'}],
+  modelType: [{required: true, message: '请选择模型类型', trigger: 'change'}],
   modelName: [{required: true, min: 1, max: 100, message: '请输入模型名称', trigger: 'blur'}]
 });
 
@@ -176,6 +202,11 @@ const onSizeChange = (size: number) => {
 
 const onResetSearchForm = () => {
   pageParam.value.searchObject = {};
+}
+
+const typeLabel = (type: string) => {
+  const map: Record<string, string> = {chat: '对话', image: '文生图', vision: '视觉', tts: '语音合成', stt: '语音识别', embedding: '向量化'}
+  return map[type] || type
 }
 
 const onCreate = () => {

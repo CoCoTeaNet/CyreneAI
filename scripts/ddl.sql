@@ -148,15 +148,19 @@ CREATE TABLE `ai_model_provider` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC COMMENT='AI 模型提供商表';
 
 
--- cyrene_ai.ai_model definition
+-- cyrene_ai.ai_model definition (unified model table)
 
 CREATE TABLE `ai_model` (
   `id` bigint(20) NOT NULL COMMENT '模型id',
+  `model_type` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '模型类型;chat, image, vision, tts, stt, embedding',
   `provider_id` bigint(20) NOT NULL COMMENT '提供商id',
   `model_name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '模型名称',
-  `context_window` int(11) DEFAULT NULL COMMENT '上下文窗口大小',
-  `input_price` decimal(10,4) DEFAULT NULL COMMENT '输入价格(每千token)',
-  `output_price` decimal(10,4) DEFAULT NULL COMMENT '输出价格(每千token)',
+  `context_window` int(11) DEFAULT NULL COMMENT '上下文窗口大小(仅chat模型)',
+  `input_price` decimal(10,4) DEFAULT NULL COMMENT '输入价格(每千token, 仅chat模型)',
+  `output_price` decimal(10,4) DEFAULT NULL COMMENT '输出价格(每千token, 仅chat模型)',
+  `dimension` int(11) DEFAULT NULL COMMENT '向量维度(仅embedding模型)',
+  `default_size` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '默认图片尺寸(仅image模型)',
+  `default_voice` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '默认音色(仅tts模型)',
   `is_default` tinyint(4) DEFAULT '0' COMMENT '是否默认;0否 1是',
   `sort` int(11) DEFAULT '0' COMMENT '排序号',
   `enable_status` tinyint(4) DEFAULT '1' COMMENT '启用状态;0关闭 1启用',
@@ -168,8 +172,9 @@ CREATE TABLE `ai_model` (
   `is_deleted` tinyint(4) NOT NULL DEFAULT '0' COMMENT '是否删除',
   `revision` int(11) DEFAULT NULL COMMENT '乐观锁',
   PRIMARY KEY (`id`),
+  KEY `ai_model_type_index` (`model_type`),
   KEY `ai_model_provider_id_index` (`provider_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC COMMENT='AI 模型表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC COMMENT='AI 统一模型表';
 
 -- AI对话表
 CREATE TABLE IF NOT EXISTS `ai_conversation` (
@@ -201,29 +206,6 @@ CREATE TABLE IF NOT EXISTS `ai_message` (
     INDEX `idx_conversation_id` (`conversation_id`),
     INDEX `idx_created_time` (`created_time`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='AI消息表';
-
--- 嵌入模型配置表
-CREATE TABLE IF NOT EXISTS `ai_embedding_model` (
-    `id` BIGINT NOT NULL COMMENT '主键ID',
-    `provider_type` VARCHAR(50) NOT NULL COMMENT '提供商类型;dashscope, openai',
-    `model_name` VARCHAR(100) NOT NULL COMMENT '模型名称;如 text-embedding-v3, text-embedding-3-small',
-    `api_key` VARCHAR(512) DEFAULT NULL COMMENT 'API密钥',
-    `api_base_url` VARCHAR(255) DEFAULT NULL COMMENT 'API地址',
-    `dimension` INT DEFAULT 1024 COMMENT '向量维度',
-    `is_default` TINYINT DEFAULT 0 COMMENT '是否默认;0否 1是',
-    `enable_status` TINYINT DEFAULT 1 COMMENT '启用状态;0关闭 1启用',
-    `sort` INT DEFAULT 0 COMMENT '排序号',
-    `remark` VARCHAR(255) DEFAULT NULL COMMENT '备注',
-    `create_by` BIGINT NOT NULL COMMENT '创建人',
-    `create_time` DATETIME NOT NULL COMMENT '创建时间',
-    `update_by` BIGINT DEFAULT NULL COMMENT '更新人',
-    `update_time` DATETIME DEFAULT NULL COMMENT '更新时间',
-    `is_deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除',
-    `revision` INT DEFAULT NULL COMMENT '乐观锁',
-    PRIMARY KEY (`id`),
-    INDEX `idx_provider_type` (`provider_type`),
-    INDEX `idx_is_default` (`is_default`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='嵌入模型配置表';
 
 -- 文档表
 CREATE TABLE IF NOT EXISTS `ai_document` (
@@ -343,6 +325,72 @@ CREATE TABLE IF NOT EXISTS `ai_agent` (
     INDEX `idx_enable_status` (`enable_status`),
     INDEX `idx_model_id` (`model_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='AI智能体表';
+
+-- ============================================================
+-- Phase 5: 多模态
+-- ============================================================
+
+-- AI图片生成记录表
+CREATE TABLE IF NOT EXISTS `ai_image_record` (
+    `id` BIGINT NOT NULL COMMENT '主键ID',
+    `prompt` TEXT NOT NULL COMMENT '生成提示词',
+    `revised_prompt` TEXT DEFAULT NULL COMMENT '优化后的提示词',
+    `model_name` VARCHAR(100) DEFAULT NULL COMMENT '使用的模型',
+    `image_url` TEXT DEFAULT NULL COMMENT '图片URL',
+    `image_size` VARCHAR(20) DEFAULT '1024x1024' COMMENT '图片尺寸',
+    `style` VARCHAR(50) DEFAULT NULL COMMENT '图片风格',
+    `cost` DECIMAL(12,6) DEFAULT 0 COMMENT '花费(元)',
+    `create_by` BIGINT NOT NULL COMMENT '创建人',
+    `create_time` DATETIME NOT NULL COMMENT '创建时间',
+    `update_by` BIGINT DEFAULT NULL COMMENT '更新人',
+    `update_time` DATETIME DEFAULT NULL COMMENT '更新时间',
+    `is_deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除',
+    `revision` INT DEFAULT NULL COMMENT '乐观锁',
+    PRIMARY KEY (`id`),
+    INDEX `idx_create_by` (`create_by`),
+    INDEX `idx_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='AI图片生成记录表';
+
+-- AI TTS 生成记录表
+CREATE TABLE IF NOT EXISTS `ai_tts_record` (
+    `id` BIGINT NOT NULL COMMENT '主键ID',
+    `text` TEXT NOT NULL COMMENT '合成文本',
+    `model_name` VARCHAR(100) DEFAULT NULL COMMENT '使用的模型',
+    `voice` VARCHAR(50) DEFAULT NULL COMMENT '音色',
+    `audio_url` VARCHAR(500) DEFAULT NULL COMMENT '音频文件URL',
+    `file_size` BIGINT DEFAULT 0 COMMENT '文件大小(字节)',
+    `duration_seconds` DECIMAL(10,2) DEFAULT NULL COMMENT '音频时长(秒)',
+    `cost` DECIMAL(12,6) DEFAULT 0 COMMENT '花费(元)',
+    `create_by` BIGINT NOT NULL COMMENT '创建人',
+    `create_time` DATETIME NOT NULL COMMENT '创建时间',
+    `update_by` BIGINT DEFAULT NULL COMMENT '更新人',
+    `update_time` DATETIME DEFAULT NULL COMMENT '更新时间',
+    `is_deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除',
+    `revision` INT DEFAULT NULL COMMENT '乐观锁',
+    PRIMARY KEY (`id`),
+    INDEX `idx_create_by` (`create_by`),
+    INDEX `idx_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='AI TTS生成记录表';
+
+-- AI STT 识别记录表
+CREATE TABLE IF NOT EXISTS `ai_stt_record` (
+    `id` BIGINT NOT NULL COMMENT '主键ID',
+    `audio_url` VARCHAR(500) DEFAULT NULL COMMENT '音频文件URL',
+    `model_name` VARCHAR(100) DEFAULT NULL COMMENT '使用的模型',
+    `transcript` TEXT DEFAULT NULL COMMENT '识别文本',
+    `file_size` BIGINT DEFAULT 0 COMMENT '文件大小(字节)',
+    `duration_seconds` DECIMAL(10,2) DEFAULT NULL COMMENT '音频时长(秒)',
+    `cost` DECIMAL(12,6) DEFAULT 0 COMMENT '花费(元)',
+    `create_by` BIGINT NOT NULL COMMENT '创建人',
+    `create_time` DATETIME NOT NULL COMMENT '创建时间',
+    `update_by` BIGINT DEFAULT NULL COMMENT '更新人',
+    `update_time` DATETIME DEFAULT NULL COMMENT '更新时间',
+    `is_deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除',
+    `revision` INT DEFAULT NULL COMMENT '乐观锁',
+    PRIMARY KEY (`id`),
+    INDEX `idx_create_by` (`create_by`),
+    INDEX `idx_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='AI STT识别记录表';
 
 -- AI智能体运行日志表
 CREATE TABLE IF NOT EXISTS `ai_agent_log` (

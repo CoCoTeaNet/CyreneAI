@@ -18,6 +18,8 @@ public class AiModelUpdateDTO implements Serializable {
     @NotBlank(message = "主键ID为空")
     private String id;
 
+    private String modelType;
+
     private String providerId;
 
     private String modelName;
@@ -27,6 +29,12 @@ public class AiModelUpdateDTO implements Serializable {
     private BigDecimal inputPrice;
 
     private BigDecimal outputPrice;
+
+    private Integer dimension;
+
+    private String defaultSize;
+
+    private String defaultVoice;
 
     private Integer isDefault;
 

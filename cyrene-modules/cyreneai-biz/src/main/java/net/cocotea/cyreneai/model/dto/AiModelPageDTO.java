@@ -24,6 +24,8 @@ public class AiModelPageDTO extends ApiPageDTO implements Serializable {
     @Data
     public static class Query {
 
+        private String modelType;
+
         private BigInteger providerId;
 
         private String modelName;
