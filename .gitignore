@@ -24,5 +24,6 @@
 hs_err_pid*
 
 /data/
+/uploads/
 **target/
 cyrene-starter-springboot.iml
