@@ -144,29 +144,29 @@
 ## 🎨 Phase 5 — 多模态
 
 ### 5.1 图片生成
-- [ ] 支持 DALL-E 3（OpenAI Image Model）
-- [ ] 支持 Stable Diffusion（通过 API）
-- [ ] 支持多模态模型生成图片（如 GPT-4o、Gemini 等，可配置）
-- [ ] 图片生成模型配置管理（provider、model、apiKey、参数）
-- [ ] 前端图片生成页面（prompt 输入、风格选择、尺寸选择、模型选择）
-- [ ] 生成历史记录
-- [ ] 生成的图片可引用到 Chat 中
+- [x] 支持 DALL-E 3（OpenAI Image Model）
+- [x] 支持 Stable Diffusion（通过 API）
+- [x] 支持多模态模型生成图片（如 GPT-4o、Gemini 等，可配置）
+- [x] 图片生成模型配置管理（provider、model、apiKey、参数）
+- [x] 前端图片生成页面（prompt 输入、风格选择、尺寸选择、模型选择）
+- [x] 生成历史记录
+- [x] 生成的图片可引用到 Chat 中
 
 ### 5.2 图片理解（Vision）
-- [ ] Chat 中支持上传图片
-- [ ] 多模态模型接入（GPT-4V、Qwen-VL、Claude 3、Gemini Pro Vision 等，可配置）
-- [ ] 图片识别模型配置管理（provider、model、apiKey、参数）
-- [ ] 图片 Base64 / URL 转 Message Content
+- [x] Chat 中支持上传图片
+- [x] 多模态模型接入（GPT-4V、Qwen-VL、Claude 3、Gemini Pro Vision 等，可配置）
+- [x] 图片识别模型配置管理（provider、model、apiKey、参数）
+- [x] 图片 Base64 / URL 转 Message Content
 
 ### 5.3 语音合成（TTS）
-- [ ] OpenAI TTS / DashScope 语音合成接入
-- [ ] 前端语音播放
-- [ ] 对话内容转语音下载
+- [x] OpenAI TTS / DashScope 语音合成接入
+- [x] 前端语音播放
+- [x] 对话内容转语音下载
 
 ### 5.4 语音识别（STT）
-- [ ] Whisper API 接入
-- [ ] 前端语音录制上传
-- [ ] Chat 语音输入
+- [x] Whisper API 接入
+- [x] 前端语音录制上传
+- [x] Chat 语音输入
 
 ---
 

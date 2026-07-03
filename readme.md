@@ -242,7 +242,8 @@ solon.dataSources:
 - ✅ Phase 2: 会话管理
 - ✅ Phase 3: RAG / 知识库
 - ✅ Phase 4: Agent / 工具调用
-- 🔄 Phase 5-9: 多模态、Prompt 管理、监控等（规划中）
+- ✅ Phase 5: 多模态
+- 🔄 Phase 6-9: Prompt 管理、监控等（规划中）
 
 ## License
 
