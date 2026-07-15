@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<sqltoy xmlns="http://www.sagframe.com/schema/sqltoy"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.sagframe.com/schema/sqltoy http://www.sagframe.com/schema/sqltoy/sqltoy.xsd">
+
+    <sql id="ai_prompt_template_findList">
+        <value>
+            <![CDATA[
+            select t.id, t.name, t.description, t.category, t.scene,
+                   t.content, t.variables, t.current_version, t.enable_status, t.sort,
+                   t.create_by, t.create_time, t.update_by, t.update_time
+            from ai_prompt_template t
+            where t.is_deleted=0
+            #[and t.name like :name]
+            #[and t.category = :category]
+            #[and t.scene = :scene]
+            #[and t.enable_status = :enableStatus]
+            order by t.sort desc, t.id desc
+            ]]>
+        </value>
+    </sql>
+
+    <sql id="ai_prompt_template_version_findList">
+        <value>
+            <![CDATA[
+            select v.id, v.template_id, v.version, v.content, v.variables,
+                   v.change_note, v.create_by, v.create_time
+            from ai_prompt_template_version v
+            where 1=1
+            #[and v.template_id = :templateId]
+            #[and v.version = :version]
+            order by v.version desc
+            ]]>
+        </value>
+    </sql>
+
+</sqltoy>

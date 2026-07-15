@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<sqltoy xmlns="http://www.sagframe.com/schema/sqltoy"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.sagframe.com/schema/sqltoy http://www.sagframe.com/schema/sqltoy/sqltoy.xsd">
+
+    <sql id="ai_prompt_eval_findList">
+        <value>
+            <![CDATA[
+            select e.id, e.template_id, t.name as template_name, e.template_version,
+                   e.model_id, e.model_name, e.ab_test_id, e.variant,
+                   e.input_variables, e.rendered_prompt, e.output,
+                   e.prompt_tokens, e.completion_tokens, e.total_tokens,
+                   e.cost, e.latency_ms, e.rating, e.feedback,
+                   e.create_by, e.create_time
+            from ai_prompt_eval e
+            left join ai_prompt_template t on t.id = e.template_id
+            where 1=1
+            #[and e.template_id = :templateId]
+            #[and e.ab_test_id = :abTestId]
+            #[and e.variant = :variant]
+            #[and e.rating = :rating]
+            order by e.id desc
+            ]]>
+        </value>
+    </sql>
+
+</sqltoy>

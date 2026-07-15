@@ -49,6 +49,9 @@ public class AiModel implements Serializable {
     @Column(name = "default_voice", comment = "默认音色(仅tts模型)", length = 50L, type = java.sql.Types.VARCHAR, nullable = true)
     private String defaultVoice;
 
+    @Column(name = "default_system_prompt", comment = "模型默认系统提示词(仅chat/vision模型)", length = 65535L, type = java.sql.Types.VARCHAR, nullable = true)
+    private String defaultSystemPrompt;
+
     @Column(name = "is_default", comment = "是否默认;0否 1是", length = 3L, defaultValue = "0", type = java.sql.Types.TINYINT, nullable = true)
     private Integer isDefault;
 

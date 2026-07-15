@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<sqltoy xmlns="http://www.sagframe.com/schema/sqltoy"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.sagframe.com/schema/sqltoy http://www.sagframe.com/schema/sqltoy/sqltoy.xsd">
+
+    <sql id="ai_prompt_ab_test_findList">
+        <value>
+            <![CDATA[
+            select ab.id, ab.name, ab.description,
+                   ab.template_a_id, ta.name as template_a_name, ab.template_a_version,
+                   ab.template_b_id, tb.name as template_b_name, ab.template_b_version,
+                   ab.model_id, m.model_name as model_name,
+                   ab.traffic_split, ab.status,
+                   ab.create_by, ab.create_time, ab.update_by, ab.update_time
+            from ai_prompt_ab_test ab
+            left join ai_prompt_template ta on ta.id = ab.template_a_id
+            left join ai_prompt_template tb on tb.id = ab.template_b_id
+            left join ai_model m on m.id = ab.model_id
+            where ab.is_deleted=0
+            #[and ab.name like :name]
+            #[and ab.status = :status]
+            order by ab.id desc
+            ]]>
+        </value>
+    </sql>
+
+    <sql id="ai_prompt_ab_test_stat">
+        <value>
+            <![CDATA[
+            select variant,
+                   count(1) as sample_count,
+                   avg(rating) as avg_rating
+            from ai_prompt_eval
+            where ab_test_id = :abTestId
+              and variant is not null
+            group by variant
+            ]]>
+        </value>
+    </sql>
+
+</sqltoy>

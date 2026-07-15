@@ -173,19 +173,19 @@
 ## 🧩 Phase 6 — Prompt 管理
 
 ### 6.1 提示词模板
-- [ ] `ai_prompt_template` 表：name, content, variables[], category
-- [ ] 模板变量替换引擎（`{{variable}}` 语法）
-- [ ] 提示词模板 CRUD 页面
+- [x] `ai_prompt_template` 表：name, content, variables[], category
+- [x] 模板变量替换引擎（`{{variable}}` 语法）
+- [x] 提示词模板 CRUD 页面
 
 ### 6.2 系统提示词
-- [ ] 对话级别 system prompt 编辑
-- [ ] 预设 system prompt 快速选择
-- [ ] 模型默认 system prompt 配置
+- [x] 对话级别 system prompt 编辑
+- [x] 预设 system prompt 快速选择
+- [x] 模型默认 system prompt 配置
 
 ### 6.3 Prompt 版本管理
-- [ ] 模板版本历史
-- [ ] A/B 测试支持
-- [ ] Prompt 效果评估
+- [x] 模板版本历史
+- [x] A/B 测试支持
+- [x] Prompt 效果评估
 
 ---
 

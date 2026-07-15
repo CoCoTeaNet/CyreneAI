@@ -136,3 +136,23 @@ INSERT INTO sys_role_menu (id, role_id, menu_id) VALUES
 (18200700000002003, 1699771910151151616, 18302300000001001),
 (18300700000006002, 1699771910151151616, 18302300000001003),
 (18300700000006003, 1699771910151151616, 18302300000001004),;
+
+-- Phase 6: Prompt management menus
+INSERT INTO sys_menu (id, menu_name, permission_code, router_path, parent_id, menu_type, is_menu, menu_status, component_path, is_external_link, icon_path, sort, create_by, create_time, update_by, update_time, is_deleted, revision) VALUES
+(18400000000001001, 'Prompt Template', ':ai:prompt-template', '/admin/ai-prompt-template', 1810000000000002000, 1, 1, 0, '', 0, 'Document', 14, 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL),
+(18400000000001002, 'Prompt Preset', ':ai:prompt-preset', '/admin/ai-prompt-preset', 1810000000000002000, 1, 1, 0, '', 0, 'Reading', 15, 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL),
+(18400000000001003, 'Prompt A/B Test', ':ai:prompt-ab-test', '/admin/ai-prompt-ab-test', 1810000000000002000, 1, 1, 0, '', 0, 'DataAnalysis', 16, 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL),
+(18400000000001004, 'Prompt Eval', ':ai:prompt-eval', '/admin/ai-prompt-eval', 1810000000000002000, 1, 1, 0, '', 0, 'MagicStick', 17, 1699771308310499328, NOW(), 1699771308310499328, NOW(), 0, NULL);
+
+INSERT INTO sys_role_menu (id, role_id, menu_id) VALUES
+(18400000000002001, 1699771910151151616, 18400000000001001),
+(18400000000002002, 1699771910151151616, 18400000000001002),
+(18400000000002003, 1699771910151151616, 18400000000001003),
+(18400000000002004, 1699771910151151616, 18400000000001004);
+
+-- Phase 6: Built-in prompt presets
+INSERT INTO ai_prompt_preset (id, name, description, content, category, is_builtin, enable_status, sort, create_by, create_time, update_by, update_time, is_deleted, revision) VALUES
+(18400000000003001, '通用助手', '默认的通用型 AI 助手系统提示词', 'You are a helpful, respectful and honest assistant. Answer as concisely as possible.', 'general', 1, 1, 1, 1699771308310499328, NOW(), NULL, NULL, 0, NULL),
+(18400000000003002, '编程专家', '专注于代码解释、Bug 排查、重构建议', '你是一位资深软件工程师，擅长阅读代码、定位 Bug 并给出可执行的重构建议。请用简洁、结构化的中文回答，并在必要时给出代码示例。', 'coding', 1, 1, 2, 1699771308310499328, NOW(), NULL, NULL, 0, NULL),
+(18400000000003003, '翻译助手', '中英互译，保持原文语气', '你是一名专业翻译，请将用户输入的内容在中英文之间互译，保持原意与语气，不添加任何解释。', 'translation', 1, 1, 3, 1699771308310499328, NOW(), NULL, NULL, 0, NULL),
+(18400000000003004, '文档摘要', '为长文提炼要点', '你是一位擅长信息提炼的编辑，请为下面的内容生成三到五条要点式摘要，语言与原文保持一致。', 'summary', 1, 1, 4, 1699771308310499328, NOW(), NULL, NULL, 0, NULL);

@@ -8,7 +8,7 @@
             <![CDATA[
             select m.id, m.model_type, m.provider_id, m.model_name,
                    m.context_window, m.input_price, m.output_price,
-                   m.dimension, m.default_size, m.default_voice,
+                   m.dimension, m.default_size, m.default_voice, m.default_system_prompt,
                    m.is_default, m.sort, m.enable_status, m.remark,
                    m.create_by, m.create_time, m.update_by, m.update_time, m.is_deleted, m.revision,
                    p.provider_name as provider_name

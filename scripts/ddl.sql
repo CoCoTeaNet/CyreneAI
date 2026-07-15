@@ -161,6 +161,7 @@ CREATE TABLE `ai_model` (
   `dimension` int(11) DEFAULT NULL COMMENT '向量维度(仅embedding模型)',
   `default_size` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '默认图片尺寸(仅image模型)',
   `default_voice` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '默认音色(仅tts模型)',
+  `default_system_prompt` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '模型默认系统提示词(仅chat/vision模型)',
   `is_default` tinyint(4) DEFAULT '0' COMMENT '是否默认;0否 1是',
   `sort` int(11) DEFAULT '0' COMMENT '排序号',
   `enable_status` tinyint(4) DEFAULT '1' COMMENT '启用状态;0关闭 1启用',
@@ -418,3 +419,119 @@ CREATE TABLE IF NOT EXISTS `ai_agent_log` (
     INDEX `idx_created_time` (`created_time`),
     INDEX `idx_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='AI智能体运行日志表';
+
+-- ============================================================
+-- Phase 6: Prompt 管理
+-- ============================================================
+
+-- AI 提示词模板表
+CREATE TABLE IF NOT EXISTS `ai_prompt_template` (
+    `id` BIGINT NOT NULL COMMENT '主键ID',
+    `name` VARCHAR(200) NOT NULL COMMENT '模板名称',
+    `description` VARCHAR(500) DEFAULT NULL COMMENT '模板描述',
+    `category` VARCHAR(50) DEFAULT NULL COMMENT '分类;general, translation, code, writing, roleplay, custom 等',
+    `scene` VARCHAR(20) DEFAULT 'system' COMMENT '适用场景;system, user, mixed',
+    `content` TEXT NOT NULL COMMENT '模板内容(支持 {{variable}} 变量)',
+    `variables` TEXT DEFAULT NULL COMMENT '变量列表(JSON 数组: [{"name":"xx","label":"xx","default":"xx"}])',
+    `current_version` INT DEFAULT 1 COMMENT '当前版本号',
+    `enable_status` TINYINT DEFAULT 1 COMMENT '启用状态;0关闭 1启用',
+    `sort` INT DEFAULT 0 COMMENT '排序号',
+    `create_by` BIGINT NOT NULL COMMENT '创建人',
+    `create_time` DATETIME NOT NULL COMMENT '创建时间',
+    `update_by` BIGINT DEFAULT NULL COMMENT '更新人',
+    `update_time` DATETIME DEFAULT NULL COMMENT '更新时间',
+    `is_deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除',
+    `revision` INT DEFAULT NULL COMMENT '乐观锁',
+    PRIMARY KEY (`id`),
+    INDEX `idx_category` (`category`),
+    INDEX `idx_enable_status` (`enable_status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='AI提示词模板表';
+
+-- AI 系统提示词预设表(用于对话快速选择)
+CREATE TABLE IF NOT EXISTS `ai_prompt_preset` (
+    `id` BIGINT NOT NULL COMMENT '主键ID',
+    `name` VARCHAR(200) NOT NULL COMMENT '预设名称',
+    `description` VARCHAR(500) DEFAULT NULL COMMENT '预设描述',
+    `category` VARCHAR(50) DEFAULT NULL COMMENT '分类',
+    `content` TEXT NOT NULL COMMENT '提示词内容',
+    `icon` VARCHAR(50) DEFAULT NULL COMMENT '图标',
+    `is_builtin` TINYINT DEFAULT 0 COMMENT '是否内置;0否 1是(内置不可删除)',
+    `enable_status` TINYINT DEFAULT 1 COMMENT '启用状态;0关闭 1启用',
+    `sort` INT DEFAULT 0 COMMENT '排序号',
+    `create_by` BIGINT NOT NULL COMMENT '创建人',
+    `create_time` DATETIME NOT NULL COMMENT '创建时间',
+    `update_by` BIGINT DEFAULT NULL COMMENT '更新人',
+    `update_time` DATETIME DEFAULT NULL COMMENT '更新时间',
+    `is_deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除',
+    `revision` INT DEFAULT NULL COMMENT '乐观锁',
+    PRIMARY KEY (`id`),
+    INDEX `idx_category` (`category`),
+    INDEX `idx_enable_status` (`enable_status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='AI系统提示词预设表';
+
+-- AI 提示词模板版本历史表
+CREATE TABLE IF NOT EXISTS `ai_prompt_template_version` (
+    `id` BIGINT NOT NULL COMMENT '主键ID',
+    `template_id` BIGINT NOT NULL COMMENT '模板ID',
+    `version` INT NOT NULL COMMENT '版本号(从1递增)',
+    `content` TEXT NOT NULL COMMENT '当次版本内容',
+    `variables` TEXT DEFAULT NULL COMMENT '变量列表(JSON)',
+    `change_note` VARCHAR(500) DEFAULT NULL COMMENT '变更说明',
+    `create_by` BIGINT NOT NULL COMMENT '创建人',
+    `create_time` DATETIME NOT NULL COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_template_version` (`template_id`, `version`),
+    INDEX `idx_template_id` (`template_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='AI提示词模板版本历史表';
+
+-- AI 提示词 A/B 测试表
+CREATE TABLE IF NOT EXISTS `ai_prompt_ab_test` (
+    `id` BIGINT NOT NULL COMMENT '主键ID',
+    `name` VARCHAR(200) NOT NULL COMMENT '测试名称',
+    `description` VARCHAR(500) DEFAULT NULL COMMENT '测试描述',
+    `template_a_id` BIGINT NOT NULL COMMENT '版本A模板ID',
+    `template_a_version` INT DEFAULT NULL COMMENT '版本A使用的版本号(为空则最新)',
+    `template_b_id` BIGINT NOT NULL COMMENT '版本B模板ID',
+    `template_b_version` INT DEFAULT NULL COMMENT '版本B使用的版本号(为空则最新)',
+    `model_id` BIGINT DEFAULT NULL COMMENT '使用的模型ID',
+    `traffic_split` INT DEFAULT 50 COMMENT '流量分配百分比(A侧, 0-100)',
+    `status` VARCHAR(20) DEFAULT 'running' COMMENT '状态;draft, running, finished',
+    `create_by` BIGINT NOT NULL COMMENT '创建人',
+    `create_time` DATETIME NOT NULL COMMENT '创建时间',
+    `update_by` BIGINT DEFAULT NULL COMMENT '更新人',
+    `update_time` DATETIME DEFAULT NULL COMMENT '更新时间',
+    `is_deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除',
+    `revision` INT DEFAULT NULL COMMENT '乐观锁',
+    PRIMARY KEY (`id`),
+    INDEX `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='AI提示词A/B测试表';
+
+-- AI 提示词效果评估记录表
+CREATE TABLE IF NOT EXISTS `ai_prompt_eval` (
+    `id` BIGINT NOT NULL COMMENT '主键ID',
+    `template_id` BIGINT DEFAULT NULL COMMENT '模板ID',
+    `template_version` INT DEFAULT NULL COMMENT '模板版本号',
+    `model_id` BIGINT DEFAULT NULL COMMENT '模型ID',
+    `model_name` VARCHAR(100) DEFAULT NULL COMMENT '模型名称',
+    `ab_test_id` BIGINT DEFAULT NULL COMMENT '关联A/B测试ID',
+    `variant` VARCHAR(10) DEFAULT NULL COMMENT 'A/B测试分组;A, B',
+    `input_variables` TEXT DEFAULT NULL COMMENT '输入变量(JSON)',
+    `rendered_prompt` TEXT DEFAULT NULL COMMENT '渲染后的提示词',
+    `output` TEXT DEFAULT NULL COMMENT '模型输出',
+    `prompt_tokens` INT DEFAULT 0 COMMENT '输入token数',
+    `completion_tokens` INT DEFAULT 0 COMMENT '输出token数',
+    `total_tokens` INT DEFAULT 0 COMMENT '总token数',
+    `cost` DECIMAL(12,6) DEFAULT 0 COMMENT '本次花费(元)',
+    `latency_ms` BIGINT DEFAULT 0 COMMENT '执行耗时(毫秒)',
+    `rating` TINYINT DEFAULT NULL COMMENT '效果评分(1-5)',
+    `feedback` VARCHAR(500) DEFAULT NULL COMMENT '评价反馈',
+    `create_by` BIGINT NOT NULL COMMENT '创建人',
+    `create_time` DATETIME NOT NULL COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    INDEX `idx_template_id` (`template_id`),
+    INDEX `idx_ab_test_id` (`ab_test_id`),
+    INDEX `idx_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='AI提示词效果评估记录表';
+
+-- 增量迁移: 为 ai_model 新增 default_system_prompt 字段
+-- ALTER TABLE `ai_model` ADD COLUMN `default_system_prompt` TEXT DEFAULT NULL COMMENT '模型默认系统提示词(仅chat/vision模型)' AFTER `default_voice`;

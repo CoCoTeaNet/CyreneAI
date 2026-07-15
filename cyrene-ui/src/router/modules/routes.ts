@@ -23,6 +23,10 @@ const AiImageView = () => import("@/views/ai/image/index.vue");
 const AiVisionModelView = () => import("@/views/ai/vision-model/index.vue");
 const AiSttView = () => import("@/views/ai/stt/index.vue");
 const AiTtsView = () => import("@/views/ai/tts/index.vue");
+const AiPromptTemplateView = () => import("@/views/ai/prompt-template/index.vue");
+const AiPromptPresetView = () => import("@/views/ai/prompt-preset/index.vue");
+const AiPromptAbTestView = () => import("@/views/ai/prompt-ab-test/index.vue");
+const AiPromptEvalView = () => import("@/views/ai/prompt-eval/index.vue");
 
 
 export const routes = [
@@ -64,6 +68,10 @@ export const routes = [
             {path: 'ai-vision-model', meta: {title: '视觉模型'}, name: 'AiVisionModelView', component: AiVisionModelView},
             {path: 'ai-stt', meta: {title: '语音转文字'}, name: 'AiSttView', component: AiSttView},
             {path: 'ai-tts', meta: {title: '文本转语音'}, name: 'AiTtsView', component: AiTtsView},
+            {path: 'ai-prompt-template', meta: {title: '提示词模板'}, name: 'AiPromptTemplateView', component: AiPromptTemplateView},
+            {path: 'ai-prompt-preset', meta: {title: '预设提示词'}, name: 'AiPromptPresetView', component: AiPromptPresetView},
+            {path: 'ai-prompt-ab-test', meta: {title: 'A/B 测试'}, name: 'AiPromptAbTestView', component: AiPromptAbTestView},
+            {path: 'ai-prompt-eval', meta: {title: 'Prompt 评估'}, name: 'AiPromptEvalView', component: AiPromptEvalView},
         ]
     },
     {

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<sqltoy xmlns="http://www.sagframe.com/schema/sqltoy"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.sagframe.com/schema/sqltoy http://www.sagframe.com/schema/sqltoy/sqltoy.xsd">
+
+    <sql id="ai_prompt_preset_findList">
+        <value>
+            <![CDATA[
+            select p.id, p.name, p.description, p.category, p.content,
+                   p.icon, p.is_builtin, p.enable_status, p.sort,
+                   p.create_by, p.create_time, p.update_by, p.update_time
+            from ai_prompt_preset p
+            where p.is_deleted=0
+            #[and p.name like :name]
+            #[and p.category = :category]
+            #[and p.enable_status = :enableStatus]
+            order by p.sort desc, p.id desc
+            ]]>
+        </value>
+    </sql>
+
+</sqltoy>

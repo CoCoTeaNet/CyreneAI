@@ -38,6 +38,8 @@ public class AiModelVO implements Serializable {
 
     private String defaultVoice;
 
+    private String defaultSystemPrompt;
+
     private Integer isDefault;
 
     private Integer sort;
