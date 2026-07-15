@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<sqltoy xmlns="http://www.sagframe.com/schema/sqltoy"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.sagframe.com/schema/sqltoy http://www.sagframe.com/schema/sqltoy/sqltoy.xsd">
+
+    <sql id="ai_quota_alert_findList">
+        <value>
+            <![CDATA[
+            select a.id, a.name, a.scope,
+                   a.api_key_id, k.name as api_key_name,
+                   a.metric, a.threshold_percent, a.threshold_value,
+                   a.notify_channel, a.notify_target,
+                   a.last_triggered_time, a.trigger_count, a.enable_status,
+                   a.create_time, a.update_time
+            from ai_quota_alert a
+            left join ai_api_key k on k.id = a.api_key_id
+            where a.is_deleted = 0
+            #[and a.name like concat('%', :name, '%')]
+            #[and a.scope = :scope]
+            #[and a.metric = :metric]
+            #[and a.api_key_id = :apiKeyId]
+            #[and a.enable_status = :enableStatus]
+            order by a.id desc
+            ]]>
+        </value>
+    </sql>
+
+    <sql id="ai_quota_alert_findEnabled">
+        <value>
+            <![CDATA[
+            select id, name, scope, api_key_id, metric,
+                   threshold_percent, threshold_value,
+                   notify_channel, notify_target,
+                   last_triggered_time, trigger_count, enable_status
+            from ai_quota_alert
+            where is_deleted = 0
+              and enable_status = 1
+              #[and (scope = 'global' or api_key_id = :apiKeyId)]
+            ]]>
+        </value>
+    </sql>
+
+</sqltoy>

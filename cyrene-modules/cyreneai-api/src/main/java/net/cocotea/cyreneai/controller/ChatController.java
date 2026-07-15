@@ -30,8 +30,12 @@ import net.cocotea.cyreneai.model.dto.ChatRequestDTO.ContentPart;
 import net.cocotea.cyreneai.model.po.AiConversation;
 import net.cocotea.cyreneai.model.po.AiModel;
 import net.cocotea.cyreneai.model.po.AiModelProvider;
+import net.cocotea.cyreneai.model.po.AiAuditLog;
 import net.cocotea.cyreneai.model.vo.AiRetrievalResultVO;
+import net.cocotea.cyreneai.service.AiAuditLogService;
 import net.cocotea.cyreneai.service.AiConversationService;
+import net.cocotea.cyreneai.service.governance.ContentSafetyResult;
+import net.cocotea.cyreneai.service.governance.ContentSafetyService;
 import net.cocotea.cyreneai.service.rag.KnowledgeBaseService;
 import org.noear.solon.annotation.Body;
 import org.noear.solon.annotation.Controller;
@@ -70,6 +74,12 @@ public class ChatController {
     @Inject
     private KnowledgeBaseService knowledgeBaseService;
 
+    @Inject
+    private ContentSafetyService contentSafetyService;
+
+    @Inject
+    private AiAuditLogService aiAuditLogService;
+
     @Get @Mapping("/ping")
     public String ping() {
         ChatModel model = buildDefaultModel();
@@ -92,6 +102,28 @@ public class ChatController {
         StringBuilder responseContent = new StringBuilder();
         final int[] tokenCounts = new int[3]; // prompt, completion, total
         final BigDecimal[] cost = new BigDecimal[1]; // calculated cost
+        final long startNanos = System.nanoTime();
+        final String[] auditStatus = new String[]{"success"};
+        final String[] auditError = new String[]{null};
+        final AiModel[] auditModel = new AiModel[1];
+
+        // 输入内容安全检查
+        String lastUserText = extractLastUserText(request);
+        if (lastUserText != null && !lastUserText.isEmpty()) {
+            try {
+                ContentSafetyResult safety = contentSafetyService.check(lastUserText, "input");
+                if (safety != null && !safety.isAllowed()) {
+                    writeSseData(out, JSONUtil.toJsonStr(Map.of("error", "内容安全拦截: " + safety.getReason())));
+                    out.flush();
+                    writeSseData(out, "[DONE]");
+                    out.flush();
+                    recordAudit(request, null, tokenCounts, cost[0], startNanos, "blocked", safety.getReason());
+                    return;
+                }
+            } catch (Exception se) {
+                log.error("content safety check failed", se);
+            }
+        }
 
         try {
             AiModel aiModel = getAiModel(request.getModelId());
@@ -100,6 +132,7 @@ public class ChatController {
                 out.flush();
                 return;
             }
+            auditModel[0] = aiModel;
 
             // If editing a message, truncate all messages after (and including) the edited one
             if (request.getConversationId() != null && request.getEditMessageId() != null) {
@@ -171,6 +204,8 @@ public class ChatController {
                 @Override
                 public void onError(Throwable error) {
                     try {
+                        auditStatus[0] = "error";
+                        auditError[0] = error.getMessage();
                         writeSseData(out, JSONUtil.toJsonStr(Map.of("error", error.getMessage())));
                         out.flush();
                     } catch (IOException e) {
@@ -182,6 +217,8 @@ public class ChatController {
             });
         } catch (Exception e) {
             log.error("Streaming chat error", e);
+            auditStatus[0] = "error";
+            auditError[0] = e.getMessage();
             try {
                 writeSseData(out, JSONUtil.toJsonStr(Map.of("error", e.getMessage())));
                 out.flush();
@@ -197,6 +234,9 @@ public class ChatController {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
+
+        // 记录审计日志
+        recordAudit(request, auditModel[0], tokenCounts, cost[0], startNanos, auditStatus[0], auditError[0]);
 
         // Save messages to database if conversationId is provided
         if (request.getConversationId() != null) {
@@ -652,5 +692,52 @@ public class ChatController {
                 yield null;
             }
         };
+    }
+
+    /**
+     * 从请求中抽取最后一条用户消息文本(仅文本部分)用于内容安全检查
+     */
+    private String extractLastUserText(ChatRequestDTO request) {
+        if (request == null || request.getMessages() == null || request.getMessages().isEmpty()) return null;
+        for (int i = request.getMessages().size() - 1; i >= 0; i--) {
+            ChatMessageDTO msg = request.getMessages().get(i);
+            if ("user".equals(msg.getRole()) && msg.getContent() != null) {
+                return msg.getContent();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 记录审计日志(不抛出异常, 不影响主链路)
+     */
+    private void recordAudit(ChatRequestDTO request, AiModel model, int[] tokenCounts,
+                             BigDecimal cost, long startNanos, String status, String errorMsg) {
+        try {
+            AiAuditLog log = new AiAuditLog();
+            log.setEndpoint("/ai/chat/stream");
+            log.setHttpMethod("POST");
+            log.setStatus(status == null ? "unknown" : status);
+            log.setErrorMsg(errorMsg);
+            log.setPromptTokens(tokenCounts != null ? tokenCounts[0] : 0);
+            log.setCompletionTokens(tokenCounts != null ? tokenCounts[1] : 0);
+            log.setTotalTokens(tokenCounts != null ? tokenCounts[2] : 0);
+            log.setCost(cost);
+            log.setLatencyMs((System.nanoTime() - startNanos) / 1_000_000L);
+            if (request != null) {
+                log.setConversationId(request.getConversationId());
+            }
+            if (model != null) {
+                log.setModelId(model.getId());
+                log.setModelName(model.getModelName());
+            }
+            String prompt = extractLastUserText(request);
+            if (prompt != null) {
+                log.setPromptSnippet(prompt.length() > 500 ? prompt.substring(0, 500) : prompt);
+            }
+            aiAuditLogService.record(log);
+        } catch (Exception e) {
+            ChatController.log.error("record chat audit failed", e);
+        }
     }
 }

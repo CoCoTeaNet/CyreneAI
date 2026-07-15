@@ -535,3 +535,160 @@ CREATE TABLE IF NOT EXISTS `ai_prompt_eval` (
 
 -- 增量迁移: 为 ai_model 新增 default_system_prompt 字段
 -- ALTER TABLE `ai_model` ADD COLUMN `default_system_prompt` TEXT DEFAULT NULL COMMENT '模型默认系统提示词(仅chat/vision模型)' AFTER `default_voice`;
+
+-- =============================================================
+-- Phase 7 — 管理与治理
+-- =============================================================
+
+-- 7.1 API Key 管理 —— 用户级 API Key 生成
+CREATE TABLE IF NOT EXISTS `ai_api_key` (
+    `id` BIGINT NOT NULL COMMENT '主键ID',
+    `user_id` BIGINT NOT NULL COMMENT '所属用户ID',
+    `name` VARCHAR(100) NOT NULL COMMENT 'Key 名称',
+    `description` VARCHAR(500) DEFAULT NULL COMMENT '备注',
+    `key_hash` VARCHAR(128) NOT NULL COMMENT 'Key 的 SHA-256 哈希(不存明文)',
+    `key_prefix` VARCHAR(20) NOT NULL COMMENT 'Key 前缀(用于展示,如 sk-cyr-****)',
+    `allowed_model_ids` VARCHAR(1000) DEFAULT NULL COMMENT '允许使用的模型ID列表(逗号分隔,空=全部)',
+    `allowed_ip_list` VARCHAR(1000) DEFAULT NULL COMMENT '允许调用的IP白名单(逗号分隔,空=不限)',
+    `rpm_limit` INT DEFAULT NULL COMMENT '每分钟请求数限制(null=不限)',
+    `tpm_limit` INT DEFAULT NULL COMMENT '每分钟Token数限制(null=不限)',
+    `monthly_token_quota` BIGINT DEFAULT NULL COMMENT '月度Token配额(null=不限)',
+    `tokens_used_this_month` BIGINT DEFAULT 0 COMMENT '本月已用Token数',
+    `quota_reset_time` DATETIME DEFAULT NULL COMMENT '配额下次重置时间',
+    `expire_time` DATETIME DEFAULT NULL COMMENT '过期时间(null=永久)',
+    `last_used_time` DATETIME DEFAULT NULL COMMENT '最近使用时间',
+    `enable_status` TINYINT DEFAULT 1 COMMENT '启用状态;0关闭 1启用',
+    `sort` INT DEFAULT 0 COMMENT '排序号',
+    `create_by` BIGINT NOT NULL COMMENT '创建人',
+    `create_time` DATETIME NOT NULL COMMENT '创建时间',
+    `update_by` BIGINT DEFAULT NULL COMMENT '更新人',
+    `update_time` DATETIME DEFAULT NULL COMMENT '更新时间',
+    `is_deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除',
+    `revision` INT DEFAULT NULL COMMENT '乐观锁',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_key_hash` (`key_hash`),
+    INDEX `idx_user_id` (`user_id`),
+    INDEX `idx_enable_status` (`enable_status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='AI API Key 表';
+
+-- 7.1 API Key 每日调用统计(供统计面板聚合)
+CREATE TABLE IF NOT EXISTS `ai_api_key_usage_daily` (
+    `id` BIGINT NOT NULL COMMENT '主键ID',
+    `api_key_id` BIGINT NOT NULL COMMENT 'API Key ID',
+    `user_id` BIGINT NOT NULL COMMENT '用户ID',
+    `stat_date` DATE NOT NULL COMMENT '统计日期',
+    `request_count` INT NOT NULL DEFAULT 0 COMMENT '请求次数',
+    `success_count` INT NOT NULL DEFAULT 0 COMMENT '成功次数',
+    `blocked_count` INT NOT NULL DEFAULT 0 COMMENT '被拦截次数',
+    `error_count` INT NOT NULL DEFAULT 0 COMMENT '异常次数',
+    `prompt_tokens` BIGINT NOT NULL DEFAULT 0 COMMENT '输入Token数',
+    `completion_tokens` BIGINT NOT NULL DEFAULT 0 COMMENT '输出Token数',
+    `total_tokens` BIGINT NOT NULL DEFAULT 0 COMMENT '总Token数',
+    `cost` DECIMAL(14,6) NOT NULL DEFAULT 0 COMMENT '当日花费(元)',
+    `create_time` DATETIME NOT NULL COMMENT '创建时间',
+    `update_time` DATETIME DEFAULT NULL COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_key_date` (`api_key_id`, `stat_date`),
+    INDEX `idx_user_date` (`user_id`, `stat_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='AI API Key 每日调用统计';
+
+-- 7.2 配额告警
+CREATE TABLE IF NOT EXISTS `ai_quota_alert` (
+    `id` BIGINT NOT NULL COMMENT '主键ID',
+    `name` VARCHAR(100) NOT NULL COMMENT '告警名称',
+    `scope` VARCHAR(20) NOT NULL COMMENT '作用范围;global 全局, key 单Key',
+    `api_key_id` BIGINT DEFAULT NULL COMMENT '关联API Key ID(scope=key 时必填)',
+    `metric` VARCHAR(20) NOT NULL COMMENT '监控指标;monthly_tokens, daily_cost, error_rate',
+    `threshold_percent` INT DEFAULT NULL COMMENT '阈值百分比(相对配额)',
+    `threshold_value` DECIMAL(14,6) DEFAULT NULL COMMENT '阈值绝对值',
+    `notify_channel` VARCHAR(50) DEFAULT 'system' COMMENT '通知渠道;system, email, webhook',
+    `notify_target` VARCHAR(500) DEFAULT NULL COMMENT '通知目标(邮箱/URL)',
+    `last_triggered_time` DATETIME DEFAULT NULL COMMENT '最近触发时间',
+    `trigger_count` INT NOT NULL DEFAULT 0 COMMENT '累计触发次数',
+    `enable_status` TINYINT DEFAULT 1 COMMENT '启用状态;0关闭 1启用',
+    `create_by` BIGINT NOT NULL COMMENT '创建人',
+    `create_time` DATETIME NOT NULL COMMENT '创建时间',
+    `update_by` BIGINT DEFAULT NULL COMMENT '更新人',
+    `update_time` DATETIME DEFAULT NULL COMMENT '更新时间',
+    `is_deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除',
+    `revision` INT DEFAULT NULL COMMENT '乐观锁',
+    PRIMARY KEY (`id`),
+    INDEX `idx_scope` (`scope`),
+    INDEX `idx_api_key_id` (`api_key_id`),
+    INDEX `idx_enable_status` (`enable_status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='AI 配额告警配置表';
+
+-- 7.3 审计日志
+CREATE TABLE IF NOT EXISTS `ai_audit_log` (
+    `id` BIGINT NOT NULL COMMENT '主键ID',
+    `user_id` BIGINT DEFAULT NULL COMMENT '用户ID',
+    `api_key_id` BIGINT DEFAULT NULL COMMENT 'API Key ID(通过Key调用时填充)',
+    `endpoint` VARCHAR(200) NOT NULL COMMENT '端点路径',
+    `http_method` VARCHAR(10) DEFAULT NULL COMMENT 'HTTP方法',
+    `model_id` BIGINT DEFAULT NULL COMMENT '模型ID',
+    `model_name` VARCHAR(100) DEFAULT NULL COMMENT '模型名称',
+    `provider_type` VARCHAR(50) DEFAULT NULL COMMENT '提供商类型',
+    `conversation_id` BIGINT DEFAULT NULL COMMENT '会话ID',
+    `request_id` VARCHAR(64) DEFAULT NULL COMMENT '请求追踪ID',
+    `prompt_snippet` VARCHAR(1000) DEFAULT NULL COMMENT '输入摘要(截断)',
+    `output_snippet` VARCHAR(1000) DEFAULT NULL COMMENT '输出摘要(截断)',
+    `prompt_tokens` INT DEFAULT 0 COMMENT '输入Token数',
+    `completion_tokens` INT DEFAULT 0 COMMENT '输出Token数',
+    `total_tokens` INT DEFAULT 0 COMMENT '总Token数',
+    `cost` DECIMAL(12,6) DEFAULT 0 COMMENT '花费(元)',
+    `latency_ms` BIGINT DEFAULT 0 COMMENT '耗时(毫秒)',
+    `status` VARCHAR(20) NOT NULL COMMENT '状态;success, blocked, error, quota_exceeded, rate_limited',
+    `error_msg` VARCHAR(1000) DEFAULT NULL COMMENT '错误信息',
+    `ip` VARCHAR(64) DEFAULT NULL COMMENT '来源IP',
+    `user_agent` VARCHAR(500) DEFAULT NULL COMMENT 'User-Agent',
+    `create_time` DATETIME NOT NULL COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    INDEX `idx_user_id` (`user_id`),
+    INDEX `idx_api_key_id` (`api_key_id`),
+    INDEX `idx_status` (`status`),
+    INDEX `idx_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='AI 请求审计日志表';
+
+-- 7.4 敏感词
+CREATE TABLE IF NOT EXISTS `ai_sensitive_word` (
+    `id` BIGINT NOT NULL COMMENT '主键ID',
+    `word` VARCHAR(200) NOT NULL COMMENT '敏感词',
+    `category` VARCHAR(50) DEFAULT 'custom' COMMENT '分类;politics, violence, adult, custom 等',
+    `strategy` VARCHAR(20) NOT NULL DEFAULT 'block' COMMENT '策略;block 拦截, replace 替换, warn 警告',
+    `replacement` VARCHAR(200) DEFAULT '***' COMMENT '替换文本(strategy=replace 生效)',
+    `target` VARCHAR(20) NOT NULL DEFAULT 'both' COMMENT '作用目标;input 输入, output 输出, both 双向',
+    `enable_status` TINYINT DEFAULT 1 COMMENT '启用状态;0关闭 1启用',
+    `sort` INT DEFAULT 0 COMMENT '排序号',
+    `create_by` BIGINT NOT NULL COMMENT '创建人',
+    `create_time` DATETIME NOT NULL COMMENT '创建时间',
+    `update_by` BIGINT DEFAULT NULL COMMENT '更新人',
+    `update_time` DATETIME DEFAULT NULL COMMENT '更新时间',
+    `is_deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除',
+    `revision` INT DEFAULT NULL COMMENT '乐观锁',
+    PRIMARY KEY (`id`),
+    INDEX `idx_word` (`word`),
+    INDEX `idx_category` (`category`),
+    INDEX `idx_enable_status` (`enable_status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='AI 敏感词表';
+
+-- 7.4 内容审核规则(接入 Moderation API 等)
+CREATE TABLE IF NOT EXISTS `ai_moderation_rule` (
+    `id` BIGINT NOT NULL COMMENT '主键ID',
+    `name` VARCHAR(100) NOT NULL COMMENT '规则名称',
+    `provider` VARCHAR(50) NOT NULL COMMENT '提供者;openai_moderation, dashscope, sensitive_word, keyword_regex',
+    `config_json` TEXT DEFAULT NULL COMMENT '规则配置(JSON)',
+    `threshold` DECIMAL(6,4) DEFAULT NULL COMMENT '分数阈值(0-1)',
+    `action` VARCHAR(20) NOT NULL DEFAULT 'block' COMMENT '命中动作;block, replace, warn, pass',
+    `target` VARCHAR(20) NOT NULL DEFAULT 'both' COMMENT '作用目标;input, output, both',
+    `sort` INT DEFAULT 0 COMMENT '排序号(优先级,数值大优先)',
+    `enable_status` TINYINT DEFAULT 1 COMMENT '启用状态;0关闭 1启用',
+    `create_by` BIGINT NOT NULL COMMENT '创建人',
+    `create_time` DATETIME NOT NULL COMMENT '创建时间',
+    `update_by` BIGINT DEFAULT NULL COMMENT '更新人',
+    `update_time` DATETIME DEFAULT NULL COMMENT '更新时间',
+    `is_deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除',
+    `revision` INT DEFAULT NULL COMMENT '乐观锁',
+    PRIMARY KEY (`id`),
+    INDEX `idx_provider` (`provider`),
+    INDEX `idx_enable_status` (`enable_status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='AI 内容审核规则表';

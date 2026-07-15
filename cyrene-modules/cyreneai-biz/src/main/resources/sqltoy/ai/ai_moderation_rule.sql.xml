@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<sqltoy xmlns="http://www.sagframe.com/schema/sqltoy"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.sagframe.com/schema/sqltoy http://www.sagframe.com/schema/sqltoy/sqltoy.xsd">
+
+    <sql id="ai_moderation_rule_findList">
+        <value>
+            <![CDATA[
+            select r.id, r.name, r.provider, r.config_json, r.threshold,
+                   r.action, r.target, r.sort, r.enable_status,
+                   r.create_by, r.create_time, r.update_by, r.update_time
+            from ai_moderation_rule r
+            where r.is_deleted = 0
+            #[and r.name like concat('%', :name, '%')]
+            #[and r.provider = :provider]
+            #[and r.target = :target]
+            #[and r.enable_status = :enableStatus]
+            order by r.sort desc, r.id desc
+            ]]>
+        </value>
+    </sql>
+
+    <sql id="ai_moderation_rule_findEnabled">
+        <value>
+            <![CDATA[
+            select id, name, provider, config_json, threshold,
+                   action, target, sort, enable_status
+            from ai_moderation_rule
+            where is_deleted = 0
+              and enable_status = 1
+            order by sort desc, id desc
+            ]]>
+        </value>
+    </sql>
+
+</sqltoy>

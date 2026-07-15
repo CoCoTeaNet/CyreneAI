@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<sqltoy xmlns="http://www.sagframe.com/schema/sqltoy"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.sagframe.com/schema/sqltoy http://www.sagframe.com/schema/sqltoy/sqltoy.xsd">
+
+    <sql id="ai_api_key_findList">
+        <value>
+            <![CDATA[
+            select k.id, k.user_id, u.username as user_name,
+                   k.name, k.description, k.key_prefix,
+                   k.allowed_model_ids, k.allowed_ip_list,
+                   k.rpm_limit, k.tpm_limit,
+                   k.monthly_token_quota, k.tokens_used_this_month,
+                   k.quota_reset_time, k.expire_time, k.last_used_time,
+                   k.enable_status, k.sort,
+                   k.create_by, k.create_time, k.update_by, k.update_time
+            from ai_api_key k
+            left join sys_user u on u.id = k.user_id
+            where k.is_deleted = 0
+            #[and k.name like concat('%', :name, '%')]
+            #[and k.user_id = :userId]
+            #[and k.enable_status = :enableStatus]
+            order by k.sort desc, k.id desc
+            ]]>
+        </value>
+    </sql>
+
+    <sql id="ai_api_key_findByHash">
+        <value>
+            <![CDATA[
+            select k.id, k.user_id, k.name, k.description, k.key_hash, k.key_prefix,
+                   k.allowed_model_ids, k.allowed_ip_list,
+                   k.rpm_limit, k.tpm_limit,
+                   k.monthly_token_quota, k.tokens_used_this_month,
+                   k.quota_reset_time, k.expire_time, k.last_used_time,
+                   k.enable_status, k.sort, k.is_deleted, k.revision
+            from ai_api_key k
+            where k.is_deleted = 0
+              and k.key_hash = :keyHash
+            ]]>
+        </value>
+    </sql>
+
+    <sql id="ai_api_key_usage_findByKeyDate">
+        <value>
+            <![CDATA[
+            select id, api_key_id, user_id, stat_date,
+                   request_count, success_count, blocked_count, error_count,
+                   prompt_tokens, completion_tokens, total_tokens, cost,
+                   create_time, update_time
+            from ai_api_key_usage_daily
+            where api_key_id = :apiKeyId
+              and stat_date = :statDate
+            ]]>
+        </value>
+    </sql>
+
+    <sql id="ai_api_key_usage_statRecent">
+        <value>
+            <![CDATA[
+            select api_key_id, user_id, stat_date,
+                   request_count, success_count, blocked_count, error_count,
+                   prompt_tokens, completion_tokens, total_tokens, cost
+            from ai_api_key_usage_daily
+            where api_key_id = :apiKeyId
+              and stat_date >= :startDate
+            order by stat_date asc
+            ]]>
+        </value>
+    </sql>
+
+</sqltoy>

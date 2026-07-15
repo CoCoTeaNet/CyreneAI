@@ -27,6 +27,11 @@ const AiPromptTemplateView = () => import("@/views/ai/prompt-template/index.vue"
 const AiPromptPresetView = () => import("@/views/ai/prompt-preset/index.vue");
 const AiPromptAbTestView = () => import("@/views/ai/prompt-ab-test/index.vue");
 const AiPromptEvalView = () => import("@/views/ai/prompt-eval/index.vue");
+const AiApiKeyView = () => import("@/views/ai/api-key/index.vue");
+const AiQuotaAlertView = () => import("@/views/ai/quota-alert/index.vue");
+const AiAuditLogView = () => import("@/views/ai/audit-log/index.vue");
+const AiSensitiveWordView = () => import("@/views/ai/sensitive-word/index.vue");
+const AiModerationRuleView = () => import("@/views/ai/moderation-rule/index.vue");
 
 
 export const routes = [
@@ -72,6 +77,12 @@ export const routes = [
             {path: 'ai-prompt-preset', meta: {title: '预设提示词'}, name: 'AiPromptPresetView', component: AiPromptPresetView},
             {path: 'ai-prompt-ab-test', meta: {title: 'A/B 测试'}, name: 'AiPromptAbTestView', component: AiPromptAbTestView},
             {path: 'ai-prompt-eval', meta: {title: 'Prompt 评估'}, name: 'AiPromptEvalView', component: AiPromptEvalView},
+            // Phase 7: 管理与治理
+            {path: 'ai-api-key', meta: {title: 'API Key 管理'}, name: 'AiApiKeyView', component: AiApiKeyView},
+            {path: 'ai-quota-alert', meta: {title: '配额告警'}, name: 'AiQuotaAlertView', component: AiQuotaAlertView},
+            {path: 'ai-audit-log', meta: {title: '审计日志'}, name: 'AiAuditLogView', component: AiAuditLogView},
+            {path: 'ai-sensitive-word', meta: {title: '敏感词管理'}, name: 'AiSensitiveWordView', component: AiSensitiveWordView},
+            {path: 'ai-moderation-rule', meta: {title: '内容审核规则'}, name: 'AiModerationRuleView', component: AiModerationRuleView},
         ]
     },
     {

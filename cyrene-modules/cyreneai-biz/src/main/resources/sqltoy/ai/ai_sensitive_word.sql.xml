@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<sqltoy xmlns="http://www.sagframe.com/schema/sqltoy"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.sagframe.com/schema/sqltoy http://www.sagframe.com/schema/sqltoy/sqltoy.xsd">
+
+    <sql id="ai_sensitive_word_findList">
+        <value>
+            <![CDATA[
+            select w.id, w.word, w.category, w.strategy, w.replacement, w.target,
+                   w.enable_status, w.sort,
+                   w.create_by, w.create_time, w.update_by, w.update_time
+            from ai_sensitive_word w
+            where w.is_deleted = 0
+            #[and w.word like concat('%', :word, '%')]
+            #[and w.category = :category]
+            #[and w.strategy = :strategy]
+            #[and w.target = :target]
+            #[and w.enable_status = :enableStatus]
+            order by w.sort desc, w.id desc
+            ]]>
+        </value>
+    </sql>
+
+    <sql id="ai_sensitive_word_findEnabled">
+        <value>
+            <![CDATA[
+            select id, word, category, strategy, replacement, target,
+                   enable_status, sort
+            from ai_sensitive_word
+            where is_deleted = 0
+              and enable_status = 1
+            order by sort desc, id desc
+            ]]>
+        </value>
+    </sql>
+
+</sqltoy>
