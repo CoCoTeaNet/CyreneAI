@@ -265,7 +265,7 @@ public class AgentService {
 
     private void trackTokenUsage(ChatResponse response, AtomicInteger prompt, AtomicInteger completion,
                                   AtomicReference<BigDecimal> costRef, BigDecimal inputPrice, BigDecimal outputPrice) {
-        if (response.metadata() != null && response.metadata().tokenUsage() != null) {
+        if (response != null && response.metadata() != null && response.metadata().tokenUsage() != null) {
             var tu = response.metadata().tokenUsage();
             prompt.addAndGet(tu.inputTokenCount());
             completion.addAndGet(tu.outputTokenCount());

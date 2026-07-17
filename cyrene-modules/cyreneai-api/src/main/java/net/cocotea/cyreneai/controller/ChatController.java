@@ -195,7 +195,9 @@ public class ChatController {
                     try {
                         // 先冲刷剩余缓冲内容
                         flushSseBuffer(out, sendBuffer, clientGone);
-                        if (response.metadata() != null && response.metadata().tokenUsage() != null) {
+                        // 部分提供商在流式结束时可能回传 null response（例如未返回用量统计的兼容端点），
+                        // 此处需做空值保护，避免 NPE 通过 onError 反馈到前端
+                        if (response != null && response.metadata() != null && response.metadata().tokenUsage() != null) {
                             var tokenUsage = response.metadata().tokenUsage();
                             tokenCounts[0] = tokenUsage.inputTokenCount();
                             tokenCounts[1] = tokenUsage.outputTokenCount();
