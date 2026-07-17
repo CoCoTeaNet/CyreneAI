@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<sqltoy xmlns="http://www.sagframe.com/schema/sqltoy"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.sagframe.com/schema/sqltoy http://www.sagframe.com/schema/sqltoy/sqltoy.xsd">
+
+    <sql id="ai_budget_findList">
+        <value>
+            <![CDATA[
+            select b.id, b.name, b.scope_type, b.scope_id, b.period,
+                   b.amount, b.alert_threshold, b.enable_status, b.remark,
+                   b.create_by, b.create_time, b.update_by, b.update_time
+            from ai_budget b
+            where b.is_deleted = 0
+            #[and b.name like concat('%', :name, '%')]
+            #[and b.scope_type = :scopeType]
+            #[and b.enable_status = :enableStatus]
+            order by b.id desc
+            ]]>
+        </value>
+    </sql>
+
+    <!-- 计算某预算范围在指定起始时间之后的已用花费 -->
+    <sql id="ai_budget_used_cost">
+        <value>
+            <![CDATA[
+            select coalesce(sum(cost), 0) as used_cost
+            from ai_audit_log
+            where create_time >= :startTime
+            #[and model_id = :modelId]
+            #[and user_id = :userId]
+            ]]>
+        </value>
+    </sql>
+
+</sqltoy>

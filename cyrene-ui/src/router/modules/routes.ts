@@ -32,6 +32,11 @@ const AiQuotaAlertView = () => import("@/views/ai/quota-alert/index.vue");
 const AiAuditLogView = () => import("@/views/ai/audit-log/index.vue");
 const AiSensitiveWordView = () => import("@/views/ai/sensitive-word/index.vue");
 const AiModerationRuleView = () => import("@/views/ai/moderation-rule/index.vue");
+// Phase 8: 监控与观测
+const AiMonitorView = () => import("@/views/ai/monitor/index.vue");
+const AiBudgetView = () => import("@/views/ai/budget/index.vue");
+const AiPlaygroundView = () => import("@/views/ai/playground/index.vue");
+const AiEvalDatasetView = () => import("@/views/ai/eval-dataset/index.vue");
 
 
 export const routes = [
@@ -83,6 +88,11 @@ export const routes = [
             {path: 'ai-audit-log', meta: {title: '审计日志'}, name: 'AiAuditLogView', component: AiAuditLogView},
             {path: 'ai-sensitive-word', meta: {title: '敏感词管理'}, name: 'AiSensitiveWordView', component: AiSensitiveWordView},
             {path: 'ai-moderation-rule', meta: {title: '内容审核规则'}, name: 'AiModerationRuleView', component: AiModerationRuleView},
+            // Phase 8: 监控与观测
+            {path: 'ai-monitor', meta: {title: '监控面板'}, name: 'AiMonitorView', component: AiMonitorView},
+            {path: 'ai-budget', meta: {title: '成本预算'}, name: 'AiBudgetView', component: AiBudgetView},
+            {path: 'ai-playground', meta: {title: '模型 Playground'}, name: 'AiPlaygroundView', component: AiPlaygroundView},
+            {path: 'ai-eval-dataset', meta: {title: '评估数据集'}, name: 'AiEvalDatasetView', component: AiEvalDatasetView},
         ]
     },
     {

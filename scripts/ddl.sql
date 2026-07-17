@@ -692,3 +692,46 @@ CREATE TABLE IF NOT EXISTS `ai_moderation_rule` (
     INDEX `idx_provider` (`provider`),
     INDEX `idx_enable_status` (`enable_status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='AI 内容审核规则表';
+
+-- 8.2 成本预算
+CREATE TABLE IF NOT EXISTS `ai_budget` (
+    `id` BIGINT NOT NULL COMMENT '主键ID',
+    `name` VARCHAR(100) NOT NULL COMMENT '预算名称',
+    `scope_type` VARCHAR(20) NOT NULL DEFAULT 'global' COMMENT '范围类型;global 全局, model 模型, user 用户',
+    `scope_id` BIGINT DEFAULT NULL COMMENT '范围对象ID(scope_type=model时为模型ID, user时为用户ID)',
+    `period` VARCHAR(20) NOT NULL DEFAULT 'month' COMMENT '统计周期;day 日, week 周, month 月',
+    `amount` DECIMAL(12,4) NOT NULL COMMENT '预算金额(元)',
+    `alert_threshold` DECIMAL(5,4) DEFAULT 0.8000 COMMENT '告警阈值(0-1),已用占比达到该值触发告警',
+    `enable_status` TINYINT DEFAULT 1 COMMENT '启用状态;0关闭 1启用',
+    `remark` VARCHAR(255) DEFAULT NULL COMMENT '备注',
+    `create_by` BIGINT NOT NULL COMMENT '创建人',
+    `create_time` DATETIME NOT NULL COMMENT '创建时间',
+    `update_by` BIGINT DEFAULT NULL COMMENT '更新人',
+    `update_time` DATETIME DEFAULT NULL COMMENT '更新时间',
+    `is_deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除',
+    `revision` INT DEFAULT NULL COMMENT '乐观锁',
+    PRIMARY KEY (`id`),
+    INDEX `idx_scope` (`scope_type`, `scope_id`),
+    INDEX `idx_enable_status` (`enable_status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='AI 成本预算表';
+
+-- 8.3 模型评估数据集
+CREATE TABLE IF NOT EXISTS `ai_eval_dataset` (
+    `id` BIGINT NOT NULL COMMENT '主键ID',
+    `name` VARCHAR(100) NOT NULL COMMENT '数据集名称',
+    `description` VARCHAR(500) DEFAULT NULL COMMENT '描述',
+    `category` VARCHAR(50) DEFAULT 'general' COMMENT '分类',
+    `items_json` MEDIUMTEXT DEFAULT NULL COMMENT '评估条目(JSON数组: [{prompt, expected}])',
+    `item_count` INT DEFAULT 0 COMMENT '条目数',
+    `enable_status` TINYINT DEFAULT 1 COMMENT '启用状态;0关闭 1启用',
+    `sort` INT DEFAULT 0 COMMENT '排序号',
+    `create_by` BIGINT NOT NULL COMMENT '创建人',
+    `create_time` DATETIME NOT NULL COMMENT '创建时间',
+    `update_by` BIGINT DEFAULT NULL COMMENT '更新人',
+    `update_time` DATETIME DEFAULT NULL COMMENT '更新时间',
+    `is_deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除',
+    `revision` INT DEFAULT NULL COMMENT '乐观锁',
+    PRIMARY KEY (`id`),
+    INDEX `idx_category` (`category`),
+    INDEX `idx_enable_status` (`enable_status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='AI 模型评估数据集表';

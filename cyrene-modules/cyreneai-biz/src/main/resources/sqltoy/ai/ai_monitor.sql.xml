@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<sqltoy xmlns="http://www.sagframe.com/schema/sqltoy"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.sagframe.com/schema/sqltoy http://www.sagframe.com/schema/sqltoy/sqltoy.xsd">
+
+    <!-- 总览统计 -->
+    <sql id="ai_monitor_overview">
+        <value>
+            <![CDATA[
+            select count(1) as request_count,
+                   coalesce(sum(total_tokens), 0) as total_tokens,
+                   coalesce(sum(cost), 0) as total_cost,
+                   coalesce(avg(latency_ms), 0) as avg_latency,
+                   coalesce(sum(case when status = 'success' then 1 else 0 end), 0) as success_count
+            from ai_audit_log
+            where 1 = 1
+            #[and create_time >= :startTime]
+            #[and create_time <= :endTime]
+            ]]>
+        </value>
+    </sql>
+
+    <!-- Token / 花费 趋势(按 :dateFormat 分组, 传入 MySQL date_format 表达式) -->
+    <sql id="ai_monitor_token_trend">
+        <value>
+            <![CDATA[
+            select date_format(create_time, :dateFormat) as period,
+                   coalesce(sum(prompt_tokens), 0) as prompt_tokens,
+                   coalesce(sum(completion_tokens), 0) as completion_tokens,
+                   coalesce(sum(total_tokens), 0) as total_tokens,
+                   coalesce(sum(cost), 0) as cost,
+                   count(1) as request_count
+            from ai_audit_log
+            where 1 = 1
+            #[and create_time >= :startTime]
+            #[and create_time <= :endTime]
+            group by date_format(create_time, :dateFormat)
+            order by period asc
+            ]]>
+        </value>
+    </sql>
+
+    <!-- 模型调用排行 / 平均延迟 -->
+    <sql id="ai_monitor_model_rank">
+        <value>
+            <![CDATA[
+            select model_id,
+                   max(model_name) as model_name,
+                   max(provider_type) as provider_type,
+                   count(1) as request_count,
+                   coalesce(sum(total_tokens), 0) as total_tokens,
+                   coalesce(sum(cost), 0) as cost,
+                   coalesce(avg(latency_ms), 0) as avg_latency
+            from ai_audit_log
+            where model_id is not null
+            #[and create_time >= :startTime]
+            #[and create_time <= :endTime]
+            group by model_id
+            order by request_count desc
+            ]]>
+        </value>
+    </sql>
+
+    <!-- 用户调用排行 -->
+    <sql id="ai_monitor_user_rank">
+        <value>
+            <![CDATA[
+            select l.user_id,
+                   max(u.username) as user_name,
+                   count(1) as request_count,
+                   coalesce(sum(l.total_tokens), 0) as total_tokens,
+                   coalesce(sum(l.cost), 0) as cost
+            from ai_audit_log l
+            left join sys_user u on u.id = l.user_id
+            where l.user_id is not null
+            #[and l.create_time >= :startTime]
+            #[and l.create_time <= :endTime]
+            group by l.user_id
+            order by request_count desc
+            ]]>
+        </value>
+    </sql>
+
+</sqltoy>

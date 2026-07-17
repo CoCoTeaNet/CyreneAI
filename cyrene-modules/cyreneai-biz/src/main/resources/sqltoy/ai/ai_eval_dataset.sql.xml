@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<sqltoy xmlns="http://www.sagframe.com/schema/sqltoy"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.sagframe.com/schema/sqltoy http://www.sagframe.com/schema/sqltoy/sqltoy.xsd">
+
+    <sql id="ai_eval_dataset_findList">
+        <value>
+            <![CDATA[
+            select d.id, d.name, d.description, d.category, d.items_json, d.item_count,
+                   d.enable_status, d.sort,
+                   d.create_by, d.create_time, d.update_by, d.update_time
+            from ai_eval_dataset d
+            where d.is_deleted = 0
+            #[and d.name like concat('%', :name, '%')]
+            #[and d.category = :category]
+            #[and d.enable_status = :enableStatus]
+            order by d.sort desc, d.id desc
+            ]]>
+        </value>
+    </sql>
+
+</sqltoy>
