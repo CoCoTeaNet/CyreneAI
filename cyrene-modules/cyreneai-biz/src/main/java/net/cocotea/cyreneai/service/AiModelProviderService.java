@@ -13,4 +13,12 @@ public interface AiModelProviderService extends BaseService<
         AiModelProviderAddDTO,
         AiModelProviderUpdateDTO
         > {
+
+    /**
+     * 密钥轮换：用旧主密钥解密全部提供商密钥，再用新主密钥重新加密。
+     * 轮换后需将配置 {@code myapp.ai.api-key-secret} 更新为新密钥。
+     *
+     * @return 成功轮换的记录数
+     */
+    int rotateSecret(String oldSecret, String newSecret);
 }

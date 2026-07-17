@@ -16,6 +16,7 @@ import net.cocotea.cyreneai.model.dto.AiPromptEvalRateDTO;
 import net.cocotea.cyreneai.model.dto.AiPromptEvalRunDTO;
 import net.cocotea.cyreneai.model.po.AiModel;
 import net.cocotea.cyreneai.model.po.AiModelProvider;
+import net.cocotea.cyreneai.util.ApiKeyCipher;
 import net.cocotea.cyreneai.model.po.AiPromptEval;
 import net.cocotea.cyreneai.model.po.AiPromptTemplate;
 import net.cocotea.cyreneai.model.vo.AiPromptEvalVO;
@@ -138,7 +139,7 @@ public class AiPromptEvalServiceImpl implements AiPromptEvalService {
 
     private ChatModel buildChatModel(AiModelProvider provider, AiModel model) {
         String type = provider.getProviderType();
-        String apiKey = provider.getApiKey() != null ? provider.getApiKey() : "";
+        String apiKey = ApiKeyCipher.decrypt(provider.getApiKey() != null ? provider.getApiKey() : "");
         String baseUrl = provider.getApiBaseUrl();
         String modelName = model.getModelName();
         return switch (type.toLowerCase()) {

@@ -12,6 +12,7 @@ import net.cocotea.cyreneai.model.dto.AiEmbeddingModelPageDTO;
 import net.cocotea.cyreneai.model.dto.AiEmbeddingModelUpdateDTO;
 import net.cocotea.cyreneai.model.po.AiModel;
 import net.cocotea.cyreneai.model.po.AiModelProvider;
+import net.cocotea.cyreneai.util.ApiKeyCipher;
 import net.cocotea.cyreneai.model.vo.AiEmbeddingModelVO;
 import net.cocotea.cyreneai.service.rag.EmbeddingService;
 import net.cocotea.cyreneadmin.model.ApiPage;
@@ -169,7 +170,7 @@ public class EmbeddingServiceImpl implements EmbeddingService {
     private EmbeddingModel buildEmbeddingModel(AiModel model) {
         AiModelProvider provider = lightDao.load(new AiModelProvider(model.getProviderId()));
         String type = provider.getProviderType();
-        String apiKey = provider.getApiKey();
+        String apiKey = ApiKeyCipher.decrypt(provider.getApiKey());
         String baseUrl = provider.getApiBaseUrl();
         String modelName = model.getModelName();
 

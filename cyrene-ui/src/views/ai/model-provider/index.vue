@@ -32,7 +32,7 @@
         <el-table-column prop="apiBaseUrl" min-width="300" label="API 地址" show-overflow-tooltip/>
         <el-table-column prop="apiKey" width="200" label="API 密钥" show-overflow-tooltip>
           <template #default="scope">
-            <span v-if="scope.row.apiKey">{{ scope.row.apiKey.substring(0, 8) }}...</span>
+            <span v-if="scope.row.apiKey">{{ scope.row.apiKey }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="sort" width="80" label="排序"/>
@@ -80,7 +80,8 @@
             <el-input v-model="editForm.apiBaseUrl" placeholder="可选"/>
           </el-form-item>
           <el-form-item label="API 密钥">
-            <el-input v-model="editForm.apiKey" type="password" show-password placeholder="可选"/>
+            <el-input v-model="editForm.apiKey" type="password" show-password
+                      :placeholder="editForm.id ? '留空或不修改则保持原密钥' : '可选'"/>
           </el-form-item>
           <el-form-item label="排序">
             <el-input-number v-model="editForm.sort" :min="0"/>

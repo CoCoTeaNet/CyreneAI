@@ -56,4 +56,17 @@ public class AiModelProviderController {
         ApiPage<AiModelProviderVO> p = aiModelProviderService.listByPage(pageDTO);
         return ApiResult.ok(p);
     }
+
+    /**
+     * 密钥轮换：用旧主密钥解密、新主密钥重新加密所有提供商密钥。
+     * 轮换后需将配置 {@code myapp.ai.api-key-secret} 更新为新密钥并重启。
+     */
+    @Mapping("/rotate-secret/{oldSecret}/{newSecret}")
+    @Post
+    @SaCheckRole(value = {"role:super:admin"}, mode = SaMode.OR)
+    public ApiResult<Integer> rotateSecret(@Param("oldSecret") String oldSecret,
+                                           @Param("newSecret") String newSecret) throws BusinessException {
+        int count = aiModelProviderService.rotateSecret(oldSecret, newSecret);
+        return ApiResult.ok(count);
+    }
 }

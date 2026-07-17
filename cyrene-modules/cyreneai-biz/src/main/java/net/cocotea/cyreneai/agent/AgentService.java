@@ -18,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import net.cocotea.cyreneadmin.util.LoginUtils;
 import net.cocotea.cyreneai.model.dto.AgentChatRequestDTO;
 import net.cocotea.cyreneai.model.po.*;
+import net.cocotea.cyreneai.util.ApiKeyCipher;
 import org.noear.solon.annotation.Component;
 import org.noear.solon.annotation.Inject;
 import org.sagacity.sqltoy.dao.LightDao;
@@ -411,7 +412,7 @@ public class AgentService {
         if (provider == null || provider.getIsDeleted() == 1 || provider.getEnableStatus() != 1) return null;
 
         String type = provider.getProviderType();
-        String apiKey = provider.getApiKey() != null ? provider.getApiKey() : "";
+        String apiKey = ApiKeyCipher.decrypt(provider.getApiKey() != null ? provider.getApiKey() : "");
         String baseUrl = provider.getApiBaseUrl();
         String modelName = model.getModelName();
 

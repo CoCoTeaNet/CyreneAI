@@ -133,7 +133,7 @@ CREATE TABLE `ai_model_provider` (
   `provider_name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '提供商名称',
   `provider_type` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '提供商类型;openai, anthropic, dashscope, ollama 等',
   `api_base_url` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'API 地址',
-  `api_key` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'API 密钥',
+  `api_key` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'API 密钥;AES 加密存储,密文以 ENC: 前缀标记(兼容历史明文)',
   `sort` int(11) DEFAULT '0' COMMENT '排序号',
   `enable_status` tinyint(4) DEFAULT '1' COMMENT '启用状态;0关闭 1启用',
   `remark` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '备注',

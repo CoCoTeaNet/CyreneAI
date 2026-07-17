@@ -37,6 +37,7 @@ import net.cocotea.cyreneai.service.AiConversationService;
 import net.cocotea.cyreneai.service.governance.ContentSafetyResult;
 import net.cocotea.cyreneai.service.governance.ContentSafetyService;
 import net.cocotea.cyreneai.service.rag.KnowledgeBaseService;
+import net.cocotea.cyreneai.util.ApiKeyCipher;
 import org.noear.solon.annotation.Body;
 import org.noear.solon.annotation.Controller;
 import org.noear.solon.annotation.Get;
@@ -55,6 +56,8 @@ import java.math.BigInteger;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -79,6 +82,24 @@ public class ChatController {
 
     @Inject
     private AiAuditLogService aiAuditLogService;
+
+    /** 流式模型实例缓存上限（LRU），避免重复构建 ChatModel。 */
+    private static final int MODEL_CACHE_MAX = 64;
+
+    /** SSE 合并发送阈值（字符数），减少 flush 次数、缓解网络 I/O 压力（背压/流控）。 */
+    private static final int SSE_FLUSH_THRESHOLD = 64;
+
+    /**
+     * 流式模型实例缓存：langchain4j 的 StreamingChatModel 不可变且线程安全，
+     * 按 提供商+模型+参数 复用，减少重复构建带来的开销。
+     */
+    private static final Map<String, StreamingChatModel> STREAMING_MODEL_CACHE =
+            Collections.synchronizedMap(new LinkedHashMap<>(16, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, StreamingChatModel> eldest) {
+                    return size() > MODEL_CACHE_MAX;
+                }
+            });
 
     @Get @Mapping("/ping")
     public String ping() {
@@ -152,21 +173,28 @@ public class ChatController {
 
             List<ChatMessage> messages = convertMessages(request.getMessages(), request.getSystemPrompt(), request.getKbId());
             messages = compressMessages(messages, aiModel, request);
+            // 背压/流控：合并待发片段、检测客户端断开
+            final StringBuilder sendBuffer = new StringBuilder();
+            final boolean[] clientGone = new boolean[]{false};
             model.chat(messages, new StreamingChatResponseHandler() {
                 @Override
                 public void onPartialResponse(String token) {
-                    try {
-                        responseContent.append(token);
-                        writeSseData(out, JSONUtil.toJsonStr(Map.of("content", token)));
-                        out.flush();
-                    } catch (IOException e) {
-                        log.error("SSE write error", e);
+                    if (clientGone[0]) {
+                        return;
+                    }
+                    responseContent.append(token);
+                    sendBuffer.append(token);
+                    // 累计超过阈值才刷新，降低 flush 频次
+                    if (sendBuffer.length() >= SSE_FLUSH_THRESHOLD) {
+                        flushSseBuffer(out, sendBuffer, clientGone);
                     }
                 }
 
                 @Override
                 public void onCompleteResponse(ChatResponse response) {
                     try {
+                        // 先冲刷剩余缓冲内容
+                        flushSseBuffer(out, sendBuffer, clientGone);
                         if (response.metadata() != null && response.metadata().tokenUsage() != null) {
                             var tokenUsage = response.metadata().tokenUsage();
                             tokenCounts[0] = tokenUsage.inputTokenCount();
@@ -299,6 +327,24 @@ public class ChatController {
         out.write(event.getBytes(StandardCharsets.UTF_8));
     }
 
+    /**
+     * 背压/流控：将缓冲区内容作为单个 SSE data 帧发送并 flush，减少 flush 频次；
+     * 写入失败视为客户端已断开，置位 clientGone 以便尽早停止推送。
+     */
+    private void flushSseBuffer(OutputStream out, StringBuilder buffer, boolean[] clientGone) {
+        if (clientGone[0] || buffer.isEmpty()) {
+            return;
+        }
+        try {
+            writeSseData(out, JSONUtil.toJsonStr(Map.of("content", buffer.toString())));
+            out.flush();
+            buffer.setLength(0);
+        } catch (IOException e) {
+            clientGone[0] = true;
+            log.warn("SSE client disconnected, stop streaming");
+        }
+    }
+
     private AiModel getAiModel(BigInteger modelId) {
         if (modelId != null) {
             AiModel model = lightDao.load(new AiModel(modelId));
@@ -332,7 +378,7 @@ public class ChatController {
 
     private StreamingChatModel buildStreamingChatModel(AiModelProvider provider, AiModel model, ChatRequestDTO request) {
         String type = provider.getProviderType();
-        String apiKey = provider.getApiKey() != null ? provider.getApiKey() : "";
+        String apiKey = ApiKeyCipher.decrypt(provider.getApiKey() != null ? provider.getApiKey() : "");
         String baseUrl = provider.getApiBaseUrl();
         String modelName = model.getModelName();
         Double temperature = request.getTemperature();
@@ -341,7 +387,17 @@ public class ChatController {
 
         log.info("model: {}", model);
 
-        return switch (type.toLowerCase()) {
+        // 命中缓存则复用，避免重复构建
+        String cacheKey = String.join("|", type,
+                String.valueOf(provider.getId()), String.valueOf(provider.getUpdateTime()),
+                String.valueOf(modelName), String.valueOf(temperature),
+                String.valueOf(topP), String.valueOf(maxTokens));
+        StreamingChatModel cached = STREAMING_MODEL_CACHE.get(cacheKey);
+        if (cached != null) {
+            return cached;
+        }
+
+        StreamingChatModel built = switch (type.toLowerCase()) {
             case "dashscope" -> {
                 var builder = QwenStreamingChatModel.builder()
                         .apiKey(apiKey)
@@ -404,6 +460,10 @@ public class ChatController {
                 yield null;
             }
         };
+        if (built != null) {
+            STREAMING_MODEL_CACHE.put(cacheKey, built);
+        }
+        return built;
     }
 
     private List<ChatMessage> convertMessages(List<ChatMessageDTO> dtos, String systemPrompt, BigInteger kbId) {
@@ -655,7 +715,7 @@ public class ChatController {
 
     private ChatModel buildChatModel(AiModelProvider provider, AiModel model) {
         String type = provider.getProviderType();
-        String apiKey = provider.getApiKey() != null ? provider.getApiKey() : "";
+        String apiKey = ApiKeyCipher.decrypt(provider.getApiKey() != null ? provider.getApiKey() : "");
         String baseUrl = provider.getApiBaseUrl();
         String modelName = model.getModelName();
 

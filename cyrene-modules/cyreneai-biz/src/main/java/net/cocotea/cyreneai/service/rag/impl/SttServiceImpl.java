@@ -13,6 +13,7 @@ import net.cocotea.cyreneai.model.dto.AiSttModelUpdateDTO;
 import net.cocotea.cyreneai.model.dto.SttTranscribeDTO;
 import net.cocotea.cyreneai.model.po.AiModel;
 import net.cocotea.cyreneai.model.po.AiModelProvider;
+import net.cocotea.cyreneai.util.ApiKeyCipher;
 import net.cocotea.cyreneai.model.po.AiSttRecord;
 import net.cocotea.cyreneai.model.vo.AiSttModelVO;
 import net.cocotea.cyreneai.model.vo.AiSttRecordVO;
@@ -277,7 +278,7 @@ public class SttServiceImpl implements SttService {
 
     private String resolveApiKey(AiModelProvider provider) {
         if (provider != null && provider.getApiKey() != null && !provider.getApiKey().isBlank()) {
-            return provider.getApiKey();
+            return ApiKeyCipher.decrypt(provider.getApiKey());
         }
         String envKey = System.getenv("OPENAI_API_KEY");
         if (envKey != null && !envKey.isBlank()) {

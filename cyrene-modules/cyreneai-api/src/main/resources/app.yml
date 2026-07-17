@@ -35,6 +35,9 @@ myapp:
   password: admin#123456
   # 密码加密的加盐
   password-salt: Admin@salt
+  # AI 提供商 API 密钥 AES 加密主密钥（生产环境务必覆盖为强随机值；轮换后需同步更新）
+  ai:
+    api-key-secret: CyreneAI@ApiKey$Secret$V1
   # 开启缓存
   permission-cache: false
   # 是否开启系统日志保存功能

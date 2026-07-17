@@ -8,6 +8,7 @@ import net.cocotea.cyreneai.model.dto.AiVisionModelPageDTO;
 import net.cocotea.cyreneai.model.dto.AiVisionModelUpdateDTO;
 import net.cocotea.cyreneai.model.po.AiModel;
 import net.cocotea.cyreneai.model.po.AiModelProvider;
+import net.cocotea.cyreneai.util.ApiKeyCipher;
 import net.cocotea.cyreneai.model.vo.AiVisionModelVO;
 import net.cocotea.cyreneai.service.rag.VisionService;
 import net.cocotea.cyreneadmin.model.ApiPage;
@@ -86,7 +87,7 @@ public class VisionServiceImpl implements VisionService {
                     vo.setId(m.getId());
                     vo.setProviderType(provider != null ? provider.getProviderType() : null);
                     vo.setModelName(m.getModelName());
-                    vo.setApiKey(provider != null ? provider.getApiKey() : null);
+                    vo.setApiKey(provider != null ? ApiKeyCipher.mask(ApiKeyCipher.decrypt(provider.getApiKey())) : null);
                     vo.setApiBaseUrl(provider != null ? provider.getApiBaseUrl() : null);
                     vo.setIsDefault(m.getIsDefault());
                     vo.setEnableStatus(m.getEnableStatus());

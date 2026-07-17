@@ -19,12 +19,15 @@ import net.cocotea.cyreneai.model.po.AiTtsRecord;
 import net.cocotea.cyreneai.model.vo.AiTtsModelVO;
 import net.cocotea.cyreneai.model.vo.AiTtsRecordVO;
 import net.cocotea.cyreneai.service.rag.TtsService;
+import net.cocotea.cyreneai.util.ApiKeyCipher;
+import net.cocotea.cyreneai.util.TextSegmenter;
 import org.noear.solon.annotation.Component;
 import org.sagacity.sqltoy.dao.LightDao;
 import org.sagacity.sqltoy.model.EntityQuery;
 import org.sagacity.sqltoy.model.Page;
 import org.sagacity.sqltoy.solon.annotation.Db;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -41,6 +44,9 @@ public class TtsServiceImpl implements TtsService {
 
     private static final String DEFAULT_TTS_URL = "https://api.openai.com/v1/audio/speech";
     private static final String AUDIO_DIR = "uploads/audio/tts/";
+
+    /** OpenAI TTS 单次输入字符上限（官方约 4096，预留余量）。 */
+    private static final int OPENAI_TTS_MAX_CHARS = 4000;
 
     private static final Map<String, List<String>> PROVIDER_VOICES = Map.of(
             "openai", List.of("alloy", "echo", "fable", "nova", "onyx", "shimmer"),
@@ -101,13 +107,13 @@ public class TtsServiceImpl implements TtsService {
                 .set("speed", speed);
 
         try {
-            byte[] audioBytes = HttpUtil.createPost(apiUrl)
-                    .header("Authorization", "Bearer " + apiKey)
-                    .header("Content-Type", "application/json")
-                    .body(requestBody.toString())
-                    .timeout(60000)
-                    .execute()
-                    .bodyBytes();
+            // 大文本分段处理：OpenAI TTS 单次输入上限约 4096 字符，分段合成后拼接 mp3 字节
+            List<String> segments = TextSegmenter.segment(dto.getText(), OPENAI_TTS_MAX_CHARS);
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+            for (String segment : segments) {
+                buffer.write(requestOpenAiTts(apiUrl, apiKey, modelName, voice, speed, segment));
+            }
+            byte[] audioBytes = buffer.toByteArray();
 
             String audioUrl = saveAudioFile(audioBytes);
 
@@ -126,6 +132,26 @@ public class TtsServiceImpl implements TtsService {
             log.error("TTS合成失败", e);
             throw new RuntimeException("TTS合成失败: " + e.getMessage());
         }
+    }
+
+    /**
+     * 调用 OpenAI 兼容 TTS 接口合成单个文本片段，返回 mp3 字节。
+     */
+    private byte[] requestOpenAiTts(String apiUrl, String apiKey, String modelName,
+                                    String voice, double speed, String text) {
+        JSONObject requestBody = JSONUtil.createObj()
+                .set("model", modelName)
+                .set("input", text)
+                .set("voice", voice)
+                .set("response_format", "mp3")
+                .set("speed", speed);
+        return HttpUtil.createPost(apiUrl)
+                .header("Authorization", "Bearer " + apiKey)
+                .header("Content-Type", "application/json")
+                .body(requestBody.toString())
+                .timeout(60000)
+                .execute()
+                .bodyBytes();
     }
 
     private byte[] synthesizeWithDashScope(AiModelProvider provider, AiModel model, TtsSynthesizeDTO dto) {
@@ -232,7 +258,7 @@ public class TtsServiceImpl implements TtsService {
                     vo.setProviderType(providerType);
                     vo.setVoices(PROVIDER_VOICES.getOrDefault(providerType, List.of()));
                     vo.setModelName(m.getModelName());
-                    vo.setApiKey(p != null ? p.getApiKey() : null);
+                    vo.setApiKey(p != null ? ApiKeyCipher.mask(ApiKeyCipher.decrypt(p.getApiKey())) : null);
                     vo.setApiBaseUrl(p != null ? p.getApiBaseUrl() : null);
                     vo.setDefaultVoice(m.getDefaultVoice());
                     vo.setIsDefault(m.getIsDefault());
@@ -337,7 +363,7 @@ public class TtsServiceImpl implements TtsService {
 
     private String resolveApiKey(AiModelProvider provider) {
         if (provider != null && provider.getApiKey() != null && !provider.getApiKey().isBlank()) {
-            return provider.getApiKey();
+            return ApiKeyCipher.decrypt(provider.getApiKey());
         }
         String envKey = System.getenv("OPENAI_API_KEY");
         if (envKey != null && !envKey.isBlank()) {

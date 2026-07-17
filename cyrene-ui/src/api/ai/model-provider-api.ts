@@ -15,3 +15,8 @@ export function deleteBatch(data: any) {
 export function listByPage(data: any) {
     return request('ai/model-provider/listByPage', data, post);
 }
+
+// 密钥轮换：用旧主密钥解密、新主密钥重新加密所有提供商密钥
+export function rotateSecret(oldSecret: string, newSecret: string) {
+    return request(`ai/model-provider/rotate-secret/${encodeURIComponent(oldSecret)}/${encodeURIComponent(newSecret)}`, {}, post);
+}

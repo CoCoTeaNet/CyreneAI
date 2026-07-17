@@ -16,6 +16,7 @@ import net.cocotea.cyreneai.model.dto.PlaygroundRunDTO;
 import net.cocotea.cyreneai.model.po.AiModel;
 import net.cocotea.cyreneai.model.po.AiModelProvider;
 import net.cocotea.cyreneai.model.vo.AiPlaygroundResultVO;
+import net.cocotea.cyreneai.util.ApiKeyCipher;
 import org.noear.solon.annotation.Body;
 import org.noear.solon.annotation.Controller;
 import org.noear.solon.annotation.Mapping;
@@ -117,7 +118,7 @@ public class AiPlaygroundController {
 
     private ChatModel buildChatModel(AiModelProvider provider, AiModel model, PlaygroundRunDTO param) {
         String type = provider.getProviderType();
-        String apiKey = provider.getApiKey() != null ? provider.getApiKey() : "";
+        String apiKey = ApiKeyCipher.decrypt(provider.getApiKey() != null ? provider.getApiKey() : "");
         String baseUrl = provider.getApiBaseUrl();
         String modelName = model.getModelName();
         Double temperature = param.getTemperature();

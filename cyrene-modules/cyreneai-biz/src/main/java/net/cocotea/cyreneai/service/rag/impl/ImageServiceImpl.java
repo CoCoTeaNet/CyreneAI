@@ -14,6 +14,7 @@ import net.cocotea.cyreneai.model.dto.ImageGenerateDTO;
 import net.cocotea.cyreneai.model.po.AiImageRecord;
 import net.cocotea.cyreneai.model.po.AiModel;
 import net.cocotea.cyreneai.model.po.AiModelProvider;
+import net.cocotea.cyreneai.util.ApiKeyCipher;
 import net.cocotea.cyreneai.model.vo.AiImageModelVO;
 import net.cocotea.cyreneai.model.vo.AiImageRecordVO;
 import net.cocotea.cyreneai.service.rag.ImageService;
@@ -60,7 +61,7 @@ public class ImageServiceImpl implements ImageService {
             return "错误: 模型未关联有效的提供商";
         }
 
-        String apiKey = provider.getApiKey();
+        String apiKey = ApiKeyCipher.decrypt(provider.getApiKey());
         String baseUrl = provider.getApiBaseUrl();
         String providerType = provider.getProviderType();
 
@@ -389,7 +390,7 @@ public class ImageServiceImpl implements ImageService {
                     AiModelProvider provider = getProvider(m.getProviderId());
                     if (provider != null) {
                         vo.setProviderType(provider.getProviderType());
-                        vo.setApiKey(provider.getApiKey());
+                        vo.setApiKey(ApiKeyCipher.mask(ApiKeyCipher.decrypt(provider.getApiKey())));
                         vo.setApiBaseUrl(provider.getApiBaseUrl());
                     }
                     vo.setModelName(m.getModelName());
