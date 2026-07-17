@@ -72,6 +72,7 @@ public class AiSensitiveWordServiceImpl implements AiSensitiveWordService {
 
     @Override
     public List<AiSensitiveWord> listEnabled() {
-        return lightDao.find("ai_sensitive_word_findEnabled", MapUtil.newHashMap(0), AiSensitiveWord.class);
+        Map<String, Object> params = MapUtil.newHashMap(0);
+        return lightDao.find("ai_sensitive_word_findEnabled", params, AiSensitiveWord.class);
     }
 }

@@ -68,6 +68,7 @@ public class AiModerationRuleServiceImpl implements AiModerationRuleService {
 
     @Override
     public List<AiModerationRule> listEnabled() {
-        return lightDao.find("ai_moderation_rule_findEnabled", MapUtil.newHashMap(0), AiModerationRule.class);
+        Map<String, Object> params = MapUtil.newHashMap(0);
+        return lightDao.find("ai_moderation_rule_findEnabled", params, AiModerationRule.class);
     }
 }
