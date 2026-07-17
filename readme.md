@@ -240,10 +240,13 @@ solon.dataSources:
 - ✅ Phase 0: Chat 基础
 - ✅ Phase 1: Chat 功能完善
 - ✅ Phase 2: 会话管理
-- ✅ Phase 3: RAG / 知识库
+- 🔄 Phase 3: RAG / 知识库（核心已完成；OpenAI Embedding、Embedding API 端点、Rerank 重排序、引用来源展示待补充）
 - ✅ Phase 4: Agent / 工具调用
 - ✅ Phase 5: 多模态
-- 🔄 Phase 6-9: Prompt 管理、监控等（规划中）
+- ✅ Phase 6: Prompt 管理
+- ✅ Phase 7: 管理与治理
+- ✅ Phase 8: 监控与观测
+- ✅ Phase 9: 工程优化
 
 ## License
 
