@@ -14,6 +14,7 @@ import net.cocotea.cyreneai.model.po.AiModel;
 import net.cocotea.cyreneai.model.po.AiModelProvider;
 import net.cocotea.cyreneai.util.ApiKeyCipher;
 import net.cocotea.cyreneai.model.vo.AiEmbeddingModelVO;
+import net.cocotea.cyreneai.model.vo.AiEmbeddingResultVO;
 import net.cocotea.cyreneai.service.rag.EmbeddingService;
 import net.cocotea.cyreneadmin.model.ApiPage;
 import org.noear.solon.annotation.Component;
@@ -51,6 +52,25 @@ public class EmbeddingServiceImpl implements EmbeddingService {
                 .map(t -> t == null ? null : TextSegment.from(t))
                 .toList();
         return embeddingModel.embedAll(segments).content();
+    }
+
+    @Override
+    public AiEmbeddingResultVO embedTexts(BigInteger modelId, List<String> input) {
+        AiModel model = modelId != null ? getEmbeddingModelById(modelId) : getDefaultEmbeddingModel();
+        if (model == null) {
+            throw new IllegalStateException("No embedding model available");
+        }
+        List<String> texts = input != null ? input : List.of();
+        List<Embedding> embeddings = embedBatch(texts, model);
+        List<float[]> vectors = embeddings.stream().map(Embedding::vector).toList();
+        Integer dimension = model.getDimension();
+        if ((dimension == null || dimension <= 0) && !vectors.isEmpty() && vectors.getFirst() != null) {
+            dimension = vectors.getFirst().length;
+        }
+        return new AiEmbeddingResultVO()
+                .setModel(model.getModelName())
+                .setDimension(dimension)
+                .setEmbeddings(vectors);
     }
 
     @Override

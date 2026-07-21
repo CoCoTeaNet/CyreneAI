@@ -19,3 +19,11 @@ export function remove(id: string) {
 export function listEnabled() {
     return request('ai/embedding/model/listEnabled', {}, get);
 }
+
+/**
+ * 文本嵌入：将输入文本转换为向量
+ * @param data { modelId?: string; input: string[] }
+ */
+export function embeddings(data: any) {
+    return request('ai/embeddings', data, post);
+}
