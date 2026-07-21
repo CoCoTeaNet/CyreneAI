@@ -152,7 +152,7 @@ CREATE TABLE `ai_model_provider` (
 
 CREATE TABLE `ai_model` (
   `id` bigint(20) NOT NULL COMMENT '模型id',
-  `model_type` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '模型类型;chat, image, vision, tts, stt, embedding',
+  `model_type` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '模型类型;chat, image, vision, tts, stt, embedding, rerank',
   `provider_id` bigint(20) NOT NULL COMMENT '提供商id',
   `model_name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '模型名称',
   `context_window` int(11) DEFAULT NULL COMMENT '上下文窗口大小(仅chat模型)',

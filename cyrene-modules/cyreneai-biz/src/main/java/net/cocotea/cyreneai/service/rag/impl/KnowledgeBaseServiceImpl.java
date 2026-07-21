@@ -13,6 +13,7 @@ import net.cocotea.cyreneai.model.vo.AiKnowledgeBaseVO;
 import net.cocotea.cyreneai.model.vo.AiRetrievalResultVO;
 import net.cocotea.cyreneai.service.rag.EmbeddingService;
 import net.cocotea.cyreneai.service.rag.KnowledgeBaseService;
+import net.cocotea.cyreneai.service.rag.RerankService;
 import net.cocotea.cyreneai.service.rag.VectorStore;
 import net.cocotea.cyreneadmin.model.ApiPage;
 import org.noear.solon.annotation.Component;
@@ -43,6 +44,9 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
 
     @Inject
     private VectorStore vectorStore;
+
+    @Inject
+    private RerankService rerankService;
 
     @Override
     public AiKnowledgeBase add(AiKnowledgeBase kb) {
@@ -129,13 +133,21 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         Embedding queryEmbedding = embeddingService.embed(queryText, embeddingModel);
         if (queryEmbedding == null) return List.of();
 
+        // 优先使用调用方传入的策略，否则使用知识库自身配置的检索策略
+        String strategy = retrievalStrategy != null ? retrievalStrategy : kb.getRetrievalStrategy();
+        if (strategy == null) strategy = "top_k";
+
+        boolean useRerank = "rerank".equals(strategy);
+        float[] queryVec = queryEmbedding.vector();
+
         List<AiDocumentChunk> chunks;
-        if ("top_k".equals(retrievalStrategy) || retrievalStrategy == null) {
-            chunks = vectorStore.search(kbId, queryEmbedding.vector(), k, threshold);
-        } else if ("mmr".equals(retrievalStrategy)) {
-            chunks = searchMMR(kbId, queryEmbedding.vector(), k, threshold);
+        if ("mmr".equals(strategy)) {
+            chunks = searchMMR(kbId, queryVec, k, threshold);
+        } else if (useRerank) {
+            // rerank 策略：先扩大候选集(k*3)，再交由重排序模型精排
+            chunks = vectorStore.search(kbId, queryVec, Math.max(k * 3, k), threshold);
         } else {
-            chunks = vectorStore.search(kbId, queryEmbedding.vector(), k, threshold);
+            chunks = vectorStore.search(kbId, queryVec, k, threshold);
         }
 
         // Fetch document names
@@ -157,10 +169,17 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
             vo.setContent(chunk.getContent());
             vo.setIndex(chunk.getChunkIndex());
             vo.setMetadata(chunk.getMetadata());
+            // 基于余弦相似度计算得分，供前端引用来源展示
+            vo.setScore(cosineSimilarity(queryVec, parseChunkEmbedding(chunk)));
             results.add(vo);
         }
 
-        log.info("Retrieved {} results from knowledge base {}", results.size(), kbId);
+        // rerank 策略：调用重排序模型对候选集重新打分排序，取 top-k（未配置时优雅降级）
+        if (useRerank && !results.isEmpty()) {
+            results = rerankService.rerank(queryText, results, k);
+        }
+
+        log.info("Retrieved {} results from knowledge base {} (strategy={})", results.size(), kbId, strategy);
         return results;
     }
 

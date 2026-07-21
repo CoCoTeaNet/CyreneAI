@@ -22,7 +22,7 @@ public class AiModel implements Serializable {
     @Column(name = "id", comment = "模型id", length = 19L, type = java.sql.Types.BIGINT, nullable = false)
     private BigInteger id;
 
-    @Column(name = "model_type", comment = "模型类型;chat, image, vision, tts, stt, embedding", length = 20L, type = java.sql.Types.VARCHAR, nullable = false)
+    @Column(name = "model_type", comment = "模型类型;chat, image, vision, tts, stt, embedding, rerank", length = 20L, type = java.sql.Types.VARCHAR, nullable = false)
     private String modelType;
 
     @Column(name = "provider_id", comment = "提供商id", length = 19L, type = java.sql.Types.BIGINT, nullable = false)
