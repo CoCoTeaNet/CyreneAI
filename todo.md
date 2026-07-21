@@ -81,9 +81,9 @@
 
 ### 3.2 Embedding 模型接入
 - [x] 支持 DashScope 文本嵌入（`TextEmbeddingModel`） ✔
-- [ ] 支持 OpenAI Embedding
+- [x] 支持 OpenAI Embedding ✔
 - [x] `ai_embedding_model` 表管理嵌入模型配置 ✔
-- [ ] Embedding API 端点 `POST /ai/embeddings`
+- [x] Embedding API 端点 `POST /ai/embeddings` ✔
 
 ### 3.3 文档管理
 - [x] `ai_document` 表：id, name, type(pdf/docx/txt/md), size, status, chunk_count ✔
@@ -97,8 +97,8 @@
 - [x] `ai_knowledge_base` 表：id, name, description, model_id, chunk_size, overlap ✔
 - [x] 知识库与文档关联（多对多） ✔
 - [x] 检索策略（相似度 top-k、MMR、混合检索） ✔
-- [ ] Rerank 重排序接入
-- [ ] 引用来源展示（前端显示匹配的文档片段）
+- [x] Rerank 重排序接入 ✔
+- [x] 引用来源展示（前端显示匹配的文档片段） ✔
 - [x] Chat 时自动检索知识库并注入上下文 ✔
 
 ### 3.5 Web 爬取

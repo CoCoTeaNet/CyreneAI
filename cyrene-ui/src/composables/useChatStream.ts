@@ -3,10 +3,18 @@ import { useUserStore } from '@/stores/user';
 
 export type ChatRole = 'user' | 'assistant' | 'system';
 
+export interface ChatSource {
+    documentId?: string | null;
+    documentName?: string | null;
+    content: string;
+    score?: number | null;
+}
+
 export interface ChatMessage {
     id?: string;
     role: ChatRole;
     content: string;
+    sources?: ChatSource[];
     tokenUsage?: {
         promptTokens: number;
         completionTokens: number;
@@ -124,6 +132,10 @@ export function useChatStream() {
 
                     try {
                         const parsed = JSON.parse(data);
+                        if (parsed.type === 'sources') {
+                            assistantMsg.sources = Array.isArray(parsed.sources) ? parsed.sources : [];
+                            messages.value = [...messages.value];
+                        }
                         if (parsed.content) {
                             assistantMsg.content += parsed.content;
                             messages.value = [...messages.value];

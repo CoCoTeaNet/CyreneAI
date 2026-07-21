@@ -171,7 +171,17 @@ public class ChatController {
                 return;
             }
 
-            List<ChatMessage> messages = convertMessages(request.getMessages(), request.getSystemPrompt(), request.getKbId());
+            // 先执行知识库检索，将命中的文档片段作为引用来源通过 SSE 提前推送给前端展示
+            List<AiRetrievalResultVO> relevantDocs = retrieveRagDocs(request.getKbId(), request.getMessages());
+            if (!relevantDocs.isEmpty()) {
+                writeSseData(out, JSONUtil.toJsonStr(Map.of(
+                        "type", "sources",
+                        "sources", buildSourcePayload(relevantDocs)
+                )));
+                out.flush();
+            }
+
+            List<ChatMessage> messages = convertMessages(request.getMessages(), request.getSystemPrompt(), relevantDocs);
             messages = compressMessages(messages, aiModel, request);
             // 背压/流控：合并待发片段、检测客户端断开
             final StringBuilder sendBuffer = new StringBuilder();
@@ -468,40 +478,66 @@ public class ChatController {
         return built;
     }
 
-    private List<ChatMessage> convertMessages(List<ChatMessageDTO> dtos, String systemPrompt, BigInteger kbId) {
+    /**
+     * 知识库检索：抽取最后一条用户消息作为查询，返回命中的文档片段。
+     * 检索策略传 {@code null}，由知识库自身配置（top_k / mmr / rerank）决定。
+     */
+    private List<AiRetrievalResultVO> retrieveRagDocs(BigInteger kbId, List<ChatMessageDTO> dtos) {
+        if (kbId == null || dtos == null || dtos.isEmpty()) {
+            return Collections.emptyList();
+        }
+        try {
+            String lastUserQuery = null;
+            for (int i = dtos.size() - 1; i >= 0; i--) {
+                if ("user".equals(dtos.get(i).getRole())) {
+                    lastUserQuery = dtos.get(i).getContent();
+                    break;
+                }
+            }
+            if (lastUserQuery == null) {
+                return Collections.emptyList();
+            }
+            return knowledgeBaseService.retrieve(kbId, lastUserQuery, 5, 0.7, null);
+        } catch (Exception e) {
+            log.warn("Failed to retrieve RAG context", e);
+            return Collections.emptyList();
+        }
+    }
+
+    /**
+     * 构建 SSE 引用来源事件负载，供前端展示匹配到的文档片段。
+     */
+    private List<Map<String, Object>> buildSourcePayload(List<AiRetrievalResultVO> relevantDocs) {
+        List<Map<String, Object>> sources = new ArrayList<>();
+        for (AiRetrievalResultVO doc : relevantDocs) {
+            Map<String, Object> src = new LinkedHashMap<>();
+            src.put("documentId", doc.getDocumentId() != null ? doc.getDocumentId().toString() : null);
+            src.put("documentName", doc.getDocumentName());
+            src.put("content", doc.getContent());
+            src.put("score", doc.getScore());
+            sources.add(src);
+        }
+        return sources;
+    }
+
+    private List<ChatMessage> convertMessages(List<ChatMessageDTO> dtos, String systemPrompt, List<AiRetrievalResultVO> relevantDocs) {
         List<ChatMessage> messages = new ArrayList<>();
 
         // Inject knowledge base context as system prompt
-        if (kbId != null && dtos != null && !dtos.isEmpty()) {
-            try {
-                String lastUserQuery = null;
-                for (int i = dtos.size() - 1; i >= 0; i--) {
-                    if ("user".equals(dtos.get(i).getRole())) {
-                        lastUserQuery = dtos.get(i).getContent();
-                        break;
-                    }
+        if (relevantDocs != null && !relevantDocs.isEmpty()) {
+            StringBuilder ragContext = new StringBuilder();
+            ragContext.append("以下是来自知识库的相关参考信息，请基于这些信息回答用户问题。\n\n");
+            for (int i = 0; i < relevantDocs.size(); i++) {
+                AiRetrievalResultVO doc = relevantDocs.get(i);
+                ragContext.append("[").append(i + 1).append("] ");
+                if (doc.getDocumentName() != null) {
+                    ragContext.append("(来源: ").append(doc.getDocumentName()).append(") ");
                 }
-                if (lastUserQuery != null) {
-                    List<AiRetrievalResultVO> relevantDocs = knowledgeBaseService.retrieve(kbId, lastUserQuery, 5, 0.7, "top_k");
-                    if (!relevantDocs.isEmpty()) {
-                        StringBuilder ragContext = new StringBuilder();
-                        ragContext.append("以下是来自知识库的相关参考信息，请基于这些信息回答用户问题。\n\n");
-                        for (int i = 0; i < relevantDocs.size(); i++) {
-                            AiRetrievalResultVO doc = relevantDocs.get(i);
-                            ragContext.append("[").append(i + 1).append("] ");
-                            if (doc.getDocumentName() != null) {
-                                ragContext.append("(来源: ").append(doc.getDocumentName()).append(") ");
-                            }
-                            ragContext.append(doc.getContent()).append("\n\n");
-                        }
-                        ragContext.append("请基于上述参考信息回答用户的问题。如果参考信息不足以回答问题，请说明。");
-                        messages.add(new SystemMessage(ragContext.toString()));
-                        log.info("Injected {} RAG context chunks for kbId={}", relevantDocs.size(), kbId);
-                    }
-                }
-            } catch (Exception e) {
-                log.warn("Failed to inject RAG context", e);
+                ragContext.append(doc.getContent()).append("\n\n");
             }
+            ragContext.append("请基于上述参考信息回答用户的问题。如果参考信息不足以回答问题，请说明。");
+            messages.add(new SystemMessage(ragContext.toString()));
+            log.info("Injected {} RAG context chunks", relevantDocs.size());
         }
 
         if (systemPrompt != null && !systemPrompt.isBlank()) {

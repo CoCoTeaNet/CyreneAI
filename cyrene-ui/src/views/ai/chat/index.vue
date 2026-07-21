@@ -118,6 +118,24 @@
           </div>
           <div class="chat-msg-content">
             <div class="chat-msg-bubble" v-html="renderContent(msg)" />
+            <div v-if="msg.role === 'assistant' && msg.sources && msg.sources.length" class="chat-msg-sources">
+              <el-collapse>
+                <el-collapse-item :title="`引用来源 (${msg.sources.length})`" name="sources">
+                  <div
+                    v-for="(src, sidx) in msg.sources"
+                    :key="sidx"
+                    class="chat-source-item"
+                  >
+                    <div class="chat-source-head">
+                      <span class="chat-source-index">[{{ sidx + 1 }}]</span>
+                      <span class="chat-source-name">{{ src.documentName || '未知文档' }}</span>
+                      <span v-if="src.score != null" class="chat-source-score">相关度 {{ (src.score * 100).toFixed(1) }}%</span>
+                    </div>
+                    <div class="chat-source-content">{{ src.content }}</div>
+                  </div>
+                </el-collapse-item>
+              </el-collapse>
+            </div>
             <div class="chat-msg-actions" v-if="hoveredMsgIdx === idx && !streaming">
               <el-button
                 v-if="msg.role === 'user'"
@@ -664,6 +682,51 @@ async function scrollToBottom() {
 .chat-msg-assistant .chat-msg-bubble {
   background: var(--el-fill-color-light);
   border-bottom-left-radius: 4px;
+}
+
+.chat-msg-sources {
+  margin-top: 8px;
+  max-width: 100%;
+}
+
+.chat-source-item {
+  padding: 8px 0;
+  border-bottom: 1px dashed var(--el-border-color-lighter);
+}
+
+.chat-source-item:last-child {
+  border-bottom: none;
+}
+
+.chat-source-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.chat-source-index {
+  color: var(--el-color-primary);
+  font-weight: 600;
+}
+
+.chat-source-name {
+  font-weight: 500;
+}
+
+.chat-source-score {
+  margin-left: auto;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+
+.chat-source-content {
+  font-size: 12px;
+  color: var(--el-text-color-regular);
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.5;
 }
 
 .chat-msg-bubble :deep(pre) {
