@@ -32,6 +32,12 @@ import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
@@ -47,6 +53,15 @@ public class AgentService {
     private ToolExecutionService toolExecutionService;
 
     private static final int MAX_ITERATIONS = 10;
+
+    /** 同一轮对话内允许的重复工具调用次数上限，超出则终止 ReAct 循环（防止模型环路耗尽迭代次数） */
+    private static final int MAX_DUPLICATE_CALLS = 2;
+
+    /** 单次模型同步调用超时（秒） */
+    private static final int MODEL_CALL_TIMEOUT_SECONDS = 120;
+
+    /** 模型同步调用专用虚拟线程执行器：阻塞发生在廉价的虚拟线程上，并为 SSE 处理线程提供超时保护 */
+    private static final ExecutorService MODEL_EXECUTOR = Executors.newVirtualThreadPerTaskExecutor();
 
     public void chatStream(AgentChatRequestDTO request, OutputStream out) throws IOException {
         BigInteger agentId = request.getAgentId();
@@ -86,6 +101,8 @@ public class AgentService {
 
         List<ChatMessage> messages = buildMessages(agent, request, toolInstructions, toolSpecs);
         List<Map<String, Object>> toolCallRecords = new ArrayList<>();
+        Set<String> calledSignatures = new HashSet<>();
+        int duplicateCalls = 0;
         AtomicInteger totalPromptTokens = new AtomicInteger(0);
         AtomicInteger totalCompletionTokens = new AtomicInteger(0);
         AtomicReference<BigDecimal> totalCostRef = new AtomicReference<>(BigDecimal.ZERO);
@@ -102,7 +119,7 @@ public class AgentService {
             writeSseData(out, JSONUtil.toJsonStr(Map.of("type", "thinking", "iteration", iteration + 1)));
             out.flush();
 
-            ChatResponse response = chatModel.chat(messages);
+            ChatResponse response = callModel(chatModel, messages);
             trackTokenUsage(response, totalPromptTokens, totalCompletionTokens, totalCostRef, inputPrice, outputPrice);
 
             String content = response.aiMessage() != null ? response.aiMessage().text() : "";
@@ -112,6 +129,22 @@ public class AgentService {
             ToolCallResult toolCall = parseToolCall(content, toolSpecs);
 
             if (toolCall != null) {
+                // 重复调用检测：同名工具 + 相同参数视为环路，先提醒模型，多次重复则终止
+                String signature = toolCall.toolName + "#" + JSONUtil.toJsonStr(new TreeMap<>(toolCall.arguments));
+                if (!calledSignatures.add(signature)) {
+                    duplicateCalls++;
+                    log.warn("Duplicate tool call detected: {} (count={})", signature, duplicateCalls);
+                    if (duplicateCalls >= MAX_DUPLICATE_CALLS) {
+                        finalResponse = "检测到智能体反复以相同参数调用工具 " + toolCall.toolName + "，已终止执行。请调整问题后重试。";
+                        writeSseData(out, JSONUtil.toJsonStr(Map.of("type", "content", "content", finalResponse)));
+                        out.flush();
+                        break;
+                    }
+                    messages.add(new AiMessage(content));
+                    messages.add(new UserMessage("你已用相同参数调用过工具 " + toolCall.toolName + "，不要重复调用，请基于已有的工具结果直接回答用户问题。"));
+                    continue;
+                }
+
                 messages.add(new AiMessage(content));
                 Map<String, Object> record = Map.of(
                         "iteration", iteration + 1,
@@ -214,53 +247,88 @@ public class AgentService {
     private ToolCallResult parseToolCall(String content, List<ToolSpecification> specs) {
         if (content == null || content.isBlank()) return null;
 
-        // Try to find JSON block in the response
-        String jsonStr = extractJsonBlock(content);
-        if (jsonStr == null) return null;
+        // 逐个尝试候选 JSON 块，返回第一个能解析为合法工具调用的块
+        for (String jsonStr : extractJsonCandidates(content)) {
+            try {
+                JSONObject json = JSONUtil.parseObj(jsonStr);
+                String toolName = json.getStr("tool");
+                if (toolName == null || toolName.isBlank()) continue;
 
-        try {
-            JSONObject json = JSONUtil.parseObj(jsonStr);
-            String toolName = json.getStr("tool");
-            if (toolName == null || toolName.isBlank()) return null;
+                // Validate tool name
+                boolean validTool = specs.stream().anyMatch(s -> s.getName().equals(toolName));
+                if (!validTool && toolExecutionService.getSpecification(toolName) == null) continue;
 
-            // Validate tool name
-            boolean validTool = specs.stream().anyMatch(s -> s.getName().equals(toolName));
-            if (!validTool) {
-                // Check builtin tools
-                if (toolExecutionService.getSpecification(toolName) == null) return null;
+                JSONObject argsJson = json.getJSONObject("arguments");
+                Map<String, Object> arguments = argsJson != null ? argsJson : new HashMap<>();
+
+                return new ToolCallResult(toolName, arguments);
+            } catch (Exception e) {
+                log.debug("Failed to parse tool call candidate: {}", jsonStr, e);
             }
-
-            JSONObject argsJson = json.getJSONObject("arguments");
-            Map<String, Object> arguments = argsJson != null ? argsJson : new HashMap<>();
-
-            return new ToolCallResult(toolName, arguments);
-        } catch (Exception e) {
-            log.debug("Failed to parse tool call from response: {}", content, e);
-            return null;
         }
+        return null;
     }
 
-    private String extractJsonBlock(String content) {
-        // Try to find JSON in code block
-        int startBlock = content.indexOf("```json");
-        if (startBlock >= 0) {
-            startBlock += 7;
-            int endBlock = content.indexOf("```", startBlock);
-            if (endBlock > startBlock) {
-                return content.substring(startBlock, endBlock).trim();
+    /**
+     * 提取候选 JSON 块：优先 ```json 代码块（可能多个），其次用括号配对扫描（识别字符串与转义）提取顶层 JSON 对象；
+     * 替代原 indexOf('{')/lastIndexOf('}') 的脆弱实现（含代码块或多个 JSON 时会截取出非法片段）
+     */
+    private List<String> extractJsonCandidates(String content) {
+        List<String> candidates = new ArrayList<>();
+        int idx = 0;
+        while ((idx = content.indexOf("```json", idx)) >= 0) {
+            int start = idx + 7;
+            int end = content.indexOf("```", start);
+            if (end < start) break;
+            candidates.add(content.substring(start, end).trim());
+            idx = end + 3;
+        }
+        for (int i = content.indexOf('{'); i >= 0; i = content.indexOf('{', i + 1)) {
+            String block = scanBalancedJson(content, i);
+            if (block != null) {
+                candidates.add(block);
+                i += block.length() - 1;
             }
         }
+        return candidates;
+    }
 
-        // Try to find standalone JSON object
-        int braceStart = content.indexOf('{');
-        if (braceStart >= 0) {
-            int braceEnd = content.lastIndexOf('}');
-            if (braceEnd > braceStart) {
-                return content.substring(braceStart, braceEnd + 1);
+    /** 从 start（必须指向 '{'）开始扫描配对的 JSON 对象，未闭合返回 null */
+    private String scanBalancedJson(String content, int start) {
+        int depth = 0;
+        boolean inString = false;
+        for (int i = start; i < content.length(); i++) {
+            char c = content.charAt(i);
+            if (inString) {
+                if (c == '\\') i++;
+                else if (c == '"') inString = false;
+            } else if (c == '"') {
+                inString = true;
+            } else if (c == '{') {
+                depth++;
+            } else if (c == '}') {
+                depth--;
+                if (depth == 0) return content.substring(start, i + 1);
             }
         }
-
         return null;
+    }
+
+    /** 在虚拟线程上执行同步模型调用并限时等待，避免 SSE 处理线程被无限期阻塞 */
+    private ChatResponse callModel(ChatModel chatModel, List<ChatMessage> messages) {
+        Future<ChatResponse> future = MODEL_EXECUTOR.submit(() -> chatModel.chat(messages));
+        try {
+            return future.get(MODEL_CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            future.cancel(true);
+            throw new RuntimeException("模型调用超时(" + MODEL_CALL_TIMEOUT_SECONDS + "秒)");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("模型调用被中断");
+        } catch (ExecutionException e) {
+            Throwable cause = e.getCause() != null ? e.getCause() : e;
+            throw new RuntimeException("模型调用失败: " + cause.getMessage(), cause);
+        }
     }
 
     private void trackTokenUsage(ChatResponse response, AtomicInteger prompt, AtomicInteger completion,

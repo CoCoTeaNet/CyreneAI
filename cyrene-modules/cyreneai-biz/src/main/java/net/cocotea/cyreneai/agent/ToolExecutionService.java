@@ -7,6 +7,9 @@ import cn.hutool.json.JSONUtil;
 import net.cocotea.cyreneai.model.po.AiTool;
 import net.cocotea.cyreneai.util.SafeHttpUtils;
 import org.noear.solon.annotation.Component;
+import org.noear.solon.annotation.Init;
+import org.noear.solon.annotation.Inject;
+import org.noear.solon.core.AppContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,37 +31,19 @@ public class ToolExecutionService {
 
     private final Map<String, ToolExecutor> builtinExecutors = new ConcurrentHashMap<>();
 
-    public ToolExecutionService() {
-        autoRegisterBuiltinTools();
-    }
+    @Inject
+    private AppContext appContext;
 
-    private void autoRegisterBuiltinTools() {
-        try {
-            var classes = List.of(
-                    "net.cocotea.cyreneai.agent.tool.CalculatorTool",
-                    "net.cocotea.cyreneai.agent.tool.DateTimeTool",
-                    "net.cocotea.cyreneai.agent.tool.WebSearchTool",
-                    "net.cocotea.cyreneai.agent.tool.KnowledgeBaseTool",
-                    "net.cocotea.cyreneai.agent.tool.CodeExecutionTool",
-                    "net.cocotea.cyreneai.agent.tool.ImageGenerationTool",
-                    "net.cocotea.cyreneai.agent.tool.ImageRecognitionTool",
-                    "net.cocotea.cyreneai.agent.tool.WeatherTool"
-            );
-            for (String className : classes) {
-                try {
-                    Class<?> clazz = Class.forName(className, true, getClass().getClassLoader());
-                    ToolExecutor executor = (ToolExecutor) clazz.getDeclaredConstructor().newInstance();
-                    registerBuiltin(executor);
-                    log.info("Registered builtin tool: {}", executor.getName());
-                } catch (ClassNotFoundException e) {
-                    log.warn("Builtin tool class not found: {}", className);
-                } catch (Exception e) {
-                    log.error("Failed to register builtin tool: {}", className, e);
-                }
-            }
-        } catch (Exception e) {
-            log.error("Failed to auto-register builtin tools", e);
-        }
+    /**
+     * 从容器订阅所有 ToolExecutor Bean 完成注册；
+     * 替代原先反射 newInstance 的方式（绕过容器会导致工具内 @Inject 字段为 null，调用即 NPE）
+     */
+    @Init
+    public void init() {
+        appContext.subBeansOfType(ToolExecutor.class, executor -> {
+            registerBuiltin(executor);
+            log.info("Registered builtin tool: {}", executor.getName());
+        });
     }
 
     public void registerBuiltin(ToolExecutor executor) {

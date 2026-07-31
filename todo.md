@@ -34,13 +34,13 @@
 
 ## C. Agent 与工具框架
 
-- [ ] 🔴 **工具依赖注入失效导致 NPE** — 工具经反射 `newInstance()` 实例化（`ToolExecutionService`），`KnowledgeBaseTool` 等的 `@Inject` 字段为 null，调用即 NPE。改为从容器获取 Bean 或手动注入依赖。
-- [ ] 🟠 **无重复工具调用检测** — `AgentService` ReAct 循环无重复调用/环路检测，模型可能反复调用同一工具直至 `MAX_ITERATIONS`（=10）耗尽。
-- [ ] 🟠 **脆弱的 JSON 提取** — `AgentService.extractJsonBlock` 用 `indexOf('{')`/`lastIndexOf('}')` 提取工具调用，含代码块/多 JSON 时易解析错误。
-- [ ] 🟠 **SSE 流未在 finally 关闭** — `AgentChatController` 的 OutputStream 无 finally 兜底关闭，异常路径可能泄漏连接。
-- [ ] 🟠 **同步阻塞占用 SSE 线程** — `AgentService` 中 `chatModel.chat(messages)` 同步阻塞在 SSE 处理线程内，并发下线程占用高。
-- [ ] 🟡 **WebSearchTool 有请求无解析** — `agent/tool/WebSearchTool.java` 虽发起 Google/Bing 请求但从不解析返回 HTML，仅回固定提示文本，等同占位 stub，与 README“网页搜索”不符。
-- [ ] 🟡 **WeatherTool 空值风险** — 直接访问外部 JSON 字段，字段缺失时 NPE。
+- [x] 🔴 **工具依赖注入失效导致 NPE** — 工具经反射 `newInstance()` 实例化（`ToolExecutionService`），`KnowledgeBaseTool` 等的 `@Inject` 字段为 null，调用即 NPE。改为从容器获取 Bean 或手动注入依赖。
+- [x] 🟠 **无重复工具调用检测** — `AgentService` ReAct 循环无重复调用/环路检测，模型可能反复调用同一工具直至 `MAX_ITERATIONS`（=10）耗尽。
+- [x] 🟠 **脆弱的 JSON 提取** — `AgentService.extractJsonBlock` 用 `indexOf('{')`/`lastIndexOf('}')` 提取工具调用，含代码块/多 JSON 时易解析错误。
+- [x] 🟠 **SSE 流未在 finally 关闭** — `AgentChatController` 的 OutputStream 无 finally 兜底关闭，异常路径可能泄漏连接。
+- [x] 🟠 **同步阻塞占用 SSE 线程** — `AgentService` 中 `chatModel.chat(messages)` 同步阻塞在 SSE 处理线程内，并发下线程占用高。
+- [x] 🟡 **WebSearchTool 有请求无解析** — `agent/tool/WebSearchTool.java` 虽发起 Google/Bing 请求但从不解析返回 HTML，仅回固定提示文本，等同占位 stub，与 README“网页搜索”不符。
+- [x] 🟡 **WeatherTool 空值风险** — 直接访问外部 JSON 字段，字段缺失时 NPE。
 
 ## D. RAG / 知识库 / 文档 / 向量
 

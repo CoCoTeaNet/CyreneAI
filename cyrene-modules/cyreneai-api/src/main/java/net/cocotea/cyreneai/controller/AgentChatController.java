@@ -94,6 +94,13 @@ public class AgentChatController {
             } catch (IOException ex) {
                 log.error("SSE write error", ex);
             }
+        } finally {
+            // 兜底关闭 SSE 流，避免异常路径泄漏连接
+            try {
+                out.close();
+            } catch (IOException e) {
+                log.warn("SSE close error: {}", e.getMessage());
+            }
         }
     }
 
