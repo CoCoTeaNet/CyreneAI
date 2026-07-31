@@ -2,8 +2,6 @@ package net.cocotea.cyreneai.controller;
 
 import cn.hutool.core.map.MapUtil;
 import cn.hutool.json.JSONUtil;
-import dev.langchain4j.community.model.dashscope.QwenChatModel;
-import dev.langchain4j.community.model.dashscope.QwenStreamingChatModel;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.Content;
@@ -15,14 +13,6 @@ import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
-import dev.langchain4j.model.openai.OpenAiChatModel;
-import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
-import dev.langchain4j.model.anthropic.AnthropicChatModel;
-import dev.langchain4j.model.anthropic.AnthropicStreamingChatModel;
-import dev.langchain4j.model.ollama.OllamaChatModel;
-import dev.langchain4j.model.ollama.OllamaStreamingChatModel;
-import dev.langchain4j.model.googleai.GoogleAiGeminiChatModel;
-import dev.langchain4j.model.googleai.GoogleAiGeminiStreamingChatModel;
 import lombok.extern.slf4j.Slf4j;
 import net.cocotea.cyreneai.model.dto.ChatRequestDTO;
 import net.cocotea.cyreneai.model.dto.ChatRequestDTO.ChatMessageDTO;
@@ -30,14 +20,20 @@ import net.cocotea.cyreneai.model.dto.ChatRequestDTO.ContentPart;
 import net.cocotea.cyreneai.model.po.AiConversation;
 import net.cocotea.cyreneai.model.po.AiModel;
 import net.cocotea.cyreneai.model.po.AiModelProvider;
+import net.cocotea.cyreneai.model.po.AiApiKey;
 import net.cocotea.cyreneai.model.po.AiAuditLog;
 import net.cocotea.cyreneai.model.vo.AiRetrievalResultVO;
+import net.cocotea.cyreneai.service.AiApiKeyService;
 import net.cocotea.cyreneai.service.AiAuditLogService;
 import net.cocotea.cyreneai.service.AiConversationService;
+import net.cocotea.cyreneai.service.AiQuotaAlertService;
+import net.cocotea.cyreneai.service.ChatModelFactory;
 import net.cocotea.cyreneai.service.governance.ContentSafetyResult;
 import net.cocotea.cyreneai.service.governance.ContentSafetyService;
+import net.cocotea.cyreneai.service.governance.RateLimitService;
 import net.cocotea.cyreneai.service.rag.KnowledgeBaseService;
-import net.cocotea.cyreneai.util.ApiKeyCipher;
+import net.cocotea.cyreneai.util.TokenEstimator;
+import org.noear.solon.Solon;
 import org.noear.solon.annotation.Body;
 import org.noear.solon.annotation.Controller;
 import org.noear.solon.annotation.Get;
@@ -61,6 +57,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Valid
@@ -82,6 +79,21 @@ public class ChatController {
 
     @Inject
     private AiAuditLogService aiAuditLogService;
+
+    @Inject
+    private AiApiKeyService aiApiKeyService;
+
+    @Inject
+    private AiQuotaAlertService aiQuotaAlertService;
+
+    @Inject
+    private RateLimitService rateLimitService;
+
+    @Inject
+    private ChatModelFactory chatModelFactory;
+
+    /** 流式响应等待超时（分钟），防止模型不回调导致请求线程永久阻塞 */
+    private static final long STREAM_AWAIT_TIMEOUT_MINUTES = 10;
 
     /** 流式模型实例缓存上限（LRU），避免重复构建 ChatModel。 */
     private static final int MODEL_CACHE_MAX = 64;
@@ -146,6 +158,22 @@ public class ChatController {
             }
         }
 
+        // 限流/配额：携带平台 API Key（sk-cyr-）时执行 Key 级 RPM/TPM/月度 Token 配额校验
+        final AiApiKey apiKey = resolveApiKey(ctx);
+        final int estimatedInputTokens = estimateRequestTokens(request);
+        RateLimitService.Result limit = rateLimitService.check(apiKey, estimatedInputTokens);
+        if (!limit.allowed()) {
+            writeSseData(out, JSONUtil.toJsonStr(Map.of("error", limit.message())));
+            out.flush();
+            writeSseData(out, "[DONE]");
+            out.flush();
+            recordAudit(request, null, tokenCounts, cost[0], startNanos, limit.reason(), limit.message());
+            if (apiKey != null) {
+                aiApiKeyService.recordUsage(apiKey.getId(), apiKey.getUserId(), 0, 0, null, limit.reason());
+            }
+            return;
+        }
+
         try {
             AiModel aiModel = getAiModel(request.getModelId());
             if (aiModel == null) {
@@ -159,6 +187,11 @@ public class ChatController {
             if (request.getConversationId() != null && request.getEditMessageId() != null) {
                 conversationService.truncateMessages(request.getConversationId(), request.getEditMessageId());
                 log.info("Truncated messages after editMessageId={}", request.getEditMessageId());
+            }
+
+            // 先持久化用户消息，避免客户端中断或服务异常时丢失
+            if (request.getConversationId() != null) {
+                saveUserMessage(request);
             }
 
             BigDecimal inputPrice = aiModel.getInputPrice();
@@ -205,33 +238,38 @@ public class ChatController {
                     try {
                         // 先冲刷剩余缓冲内容
                         flushSseBuffer(out, sendBuffer, clientGone);
+                        // 输出内容安全审核：block 替换全文，replace 推送净化后内容
+                        applyOutputSafety(out, responseContent, auditStatus, auditError);
                         // 部分提供商在流式结束时可能回传 null response（例如未返回用量统计的兼容端点），
-                        // 此处需做空值保护，避免 NPE 通过 onError 反馈到前端
+                        // 此时按字符估算兑底，保证成本与审计数据不缺失（Ollama/custom 等）
                         if (response != null && response.metadata() != null && response.metadata().tokenUsage() != null) {
                             var tokenUsage = response.metadata().tokenUsage();
                             tokenCounts[0] = tokenUsage.inputTokenCount();
                             tokenCounts[1] = tokenUsage.outputTokenCount();
-                            tokenCounts[2] = tokenCounts[0] + tokenCounts[1];
-
-                            // Calculate cost
-                            if (inputPrice != null && outputPrice != null) {
-                                BigDecimal promptCost = BigDecimal.valueOf(tokenCounts[0])
-                                        .divide(BigDecimal.valueOf(1000), 6, RoundingMode.HALF_UP)
-                                        .multiply(inputPrice);
-                                BigDecimal completionCost = BigDecimal.valueOf(tokenCounts[1])
-                                        .divide(BigDecimal.valueOf(1000), 6, RoundingMode.HALF_UP)
-                                        .multiply(outputPrice);
-                                cost[0] = promptCost.add(completionCost).setScale(6, RoundingMode.HALF_UP);
-                            }
-
-                            writeSseData(out, JSONUtil.toJsonStr(Map.of(
-                                    "type", "token_usage",
-                                    "promptTokens", tokenCounts[0],
-                                    "completionTokens", tokenCounts[1],
-                                    "totalTokens", tokenCounts[2],
-                                    "cost", cost[0] != null ? cost[0].toPlainString() : "0"
-                            )));
+                        } else {
+                            tokenCounts[0] = estimatedInputTokens;
+                            tokenCounts[1] = estimateTokens(responseContent.toString());
                         }
+                        tokenCounts[2] = tokenCounts[0] + tokenCounts[1];
+
+                        // Calculate cost
+                        if (inputPrice != null && outputPrice != null) {
+                            BigDecimal promptCost = BigDecimal.valueOf(tokenCounts[0])
+                                    .divide(BigDecimal.valueOf(1000), 6, RoundingMode.HALF_UP)
+                                    .multiply(inputPrice);
+                            BigDecimal completionCost = BigDecimal.valueOf(tokenCounts[1])
+                                    .divide(BigDecimal.valueOf(1000), 6, RoundingMode.HALF_UP)
+                                    .multiply(outputPrice);
+                            cost[0] = promptCost.add(completionCost).setScale(6, RoundingMode.HALF_UP);
+                        }
+
+                        writeSseData(out, JSONUtil.toJsonStr(Map.of(
+                                "type", "token_usage",
+                                "promptTokens", tokenCounts[0],
+                                "completionTokens", tokenCounts[1],
+                                "totalTokens", tokenCounts[2],
+                                "cost", cost[0] != null ? cost[0].toPlainString() : "0"
+                        )));
                         writeSseData(out, "[DONE]");
                         out.flush();
                     } catch (IOException e) {
@@ -270,7 +308,12 @@ public class ChatController {
         }
 
         try {
-            latch.await();
+            // 防止底层模型不回调 onComplete/onError 导致请求线程永久阻塞
+            if (!latch.await(STREAM_AWAIT_TIMEOUT_MINUTES, TimeUnit.MINUTES)) {
+                log.warn("streaming chat await timeout after {} minutes", STREAM_AWAIT_TIMEOUT_MINUTES);
+                auditStatus[0] = "error";
+                auditError[0] = "streaming timeout";
+            }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
@@ -278,15 +321,30 @@ public class ChatController {
         // 记录审计日志
         recordAudit(request, auditModel[0], tokenCounts, cost[0], startNanos, auditStatus[0], auditError[0]);
 
-        // Save messages to database if conversationId is provided
+        // Key 级限流计数、用量落库（含月度 Token 累加）与配额告警评估
+        if (apiKey != null) {
+            rateLimitService.increment(apiKey, tokenCounts[2]);
+            aiApiKeyService.recordUsage(apiKey.getId(), apiKey.getUserId(),
+                    tokenCounts[0], tokenCounts[1], cost[0], auditStatus[0]);
+            try {
+                AiApiKey fresh = lightDao.load(new AiApiKey(apiKey.getId()));
+                aiQuotaAlertService.evaluate(fresh != null ? fresh : apiKey);
+            } catch (Exception e) {
+                log.error("evaluate quota alert failed", e);
+            }
+        }
+
+        // Save assistant message to database if conversationId is provided
         if (request.getConversationId() != null) {
-            saveMessages(request, responseContent.toString(), tokenCounts, cost[0]);
+            saveAssistantMessage(request, responseContent.toString(), tokenCounts, cost[0]);
         }
     }
 
-    private void saveMessages(ChatRequestDTO request, String responseContent, int[] tokenCounts, BigDecimal cost) {
+    /**
+     * 流式开始前先持久化用户消息，避免客户端中断或服务崩溃时丢失
+     */
+    private void saveUserMessage(ChatRequestDTO request) {
         try {
-            // Save the last user message
             if (request.getMessages() != null && !request.getMessages().isEmpty()) {
                 ChatMessageDTO lastUserMsg = request.getMessages().getLast();
                 if ("user".equals(lastUserMsg.getRole())) {
@@ -300,8 +358,13 @@ public class ChatController {
                     autoGenerateTitle(request.getConversationId(), lastUserMsg.getContent());
                 }
             }
+        } catch (Exception e) {
+            log.error("Failed to save user message", e);
+        }
+    }
 
-            // Save assistant response
+    private void saveAssistantMessage(ChatRequestDTO request, String responseContent, int[] tokenCounts, BigDecimal cost) {
+        try {
             if (!responseContent.isEmpty()) {
                 net.cocotea.cyreneai.model.po.AiMessage assistantMessage = new net.cocotea.cyreneai.model.po.AiMessage();
                 assistantMessage.setConversationId(request.getConversationId());
@@ -314,7 +377,7 @@ public class ChatController {
                 conversationService.saveMessage(assistantMessage);
             }
         } catch (Exception e) {
-            log.error("Failed to save messages", e);
+            log.error("Failed to save assistant message", e);
         }
     }
 
@@ -385,93 +448,21 @@ public class ChatController {
         if (provider == null || provider.getIsDeleted() == 1 || provider.getEnableStatus() != 1) {
             return null;
         }
-        return buildStreamingChatModel(provider, model, request);
-    }
-
-    private StreamingChatModel buildStreamingChatModel(AiModelProvider provider, AiModel model, ChatRequestDTO request) {
-        String type = provider.getProviderType();
-        String apiKey = ApiKeyCipher.decrypt(provider.getApiKey() != null ? provider.getApiKey() : "");
-        String baseUrl = provider.getApiBaseUrl();
-        String modelName = model.getModelName();
-        Double temperature = request.getTemperature();
-        Double topP = request.getTopP();
-        Integer maxTokens = request.getMaxTokens();
 
         log.info("model: {}", model);
 
         // 命中缓存则复用，避免重复构建
-        String cacheKey = String.join("|", type,
+        String cacheKey = String.join("|", provider.getProviderType(),
                 String.valueOf(provider.getId()), String.valueOf(provider.getUpdateTime()),
-                String.valueOf(modelName), String.valueOf(temperature),
-                String.valueOf(topP), String.valueOf(maxTokens));
+                String.valueOf(model.getModelName()), String.valueOf(request.getTemperature()),
+                String.valueOf(request.getTopP()), String.valueOf(request.getMaxTokens()));
         StreamingChatModel cached = STREAMING_MODEL_CACHE.get(cacheKey);
         if (cached != null) {
             return cached;
         }
 
-        StreamingChatModel built = switch (type.toLowerCase()) {
-            case "dashscope" -> {
-                var builder = QwenStreamingChatModel.builder()
-                        .apiKey(apiKey)
-                        .modelName(modelName);
-                if (temperature != null) builder.temperature(temperature.floatValue());
-                if (topP != null) builder.topP(topP);
-                if (maxTokens != null) builder.maxTokens(maxTokens);
-                yield builder.build();
-            }
-            case "openai" -> {
-                var builder = OpenAiStreamingChatModel.builder()
-                        .apiKey(apiKey)
-                        .modelName(modelName)
-                        .baseUrl(baseUrl != null ? baseUrl : "https://api.openai.com");
-                if (temperature != null) builder.temperature(temperature);
-                if (topP != null) builder.topP(topP);
-                if (maxTokens != null) builder.maxTokens(maxTokens);
-                yield builder.build();
-            }
-            case "anthropic" -> {
-                var builder = AnthropicStreamingChatModel.builder()
-                        .apiKey(apiKey)
-                        .modelName(modelName)
-                        .baseUrl(baseUrl != null ? baseUrl : "https://api.anthropic.com");
-                if (temperature != null) builder.temperature(temperature);
-                if (topP != null) builder.topP(topP);
-                if (maxTokens != null) builder.maxTokens(maxTokens);
-                yield builder.build();
-            }
-            case "ollama" -> {
-                var builder = OllamaStreamingChatModel.builder()
-                        .baseUrl(baseUrl != null ? baseUrl : "http://localhost:11434")
-                        .modelName(modelName);
-                if (temperature != null) builder.temperature(temperature);
-                if (topP != null) builder.topP(topP);
-                if (maxTokens != null) builder.numPredict(maxTokens);
-                yield builder.build();
-            }
-            case "gemini" -> {
-                var builder = GoogleAiGeminiStreamingChatModel.builder()
-                        .apiKey(apiKey)
-                        .modelName(modelName);
-                if (temperature != null) builder.temperature(temperature);
-                if (topP != null) builder.topP(topP);
-                if (maxTokens != null) builder.maxOutputTokens(maxTokens);
-                yield builder.build();
-            }
-            case "custom" -> {
-                var builder = OpenAiStreamingChatModel.builder()
-                        .apiKey(apiKey)
-                        .modelName(modelName)
-                        .baseUrl(baseUrl);
-                if (temperature != null) builder.temperature(temperature);
-                if (topP != null) builder.topP(topP);
-                if (maxTokens != null) builder.maxTokens(maxTokens);
-                yield builder.build();
-            }
-            default -> {
-                log.warn("unsupported provider type: {}", type);
-                yield null;
-            }
-        };
+        StreamingChatModel built = chatModelFactory.streaming(provider, model,
+                request.getTemperature(), request.getTopP(), request.getMaxTokens());
         if (built != null) {
             STREAMING_MODEL_CACHE.put(cacheKey, built);
         }
@@ -583,11 +574,10 @@ public class ChatController {
             return messages;
         }
 
-        // Simple token estimation: ~4 chars per token
+        // Token 估算：区分 CJK 与其他字符，避免中文严重低估
         int estimatedTokens = 0;
         for (ChatMessage msg : messages) {
-            String text = getTextFromMessage(msg);
-            estimatedTokens += text.length() / 4;
+            estimatedTokens += estimateTokens(getTextFromMessage(msg));
         }
 
         // If within limit, return as is
@@ -606,8 +596,7 @@ public class ChatController {
 
         for (ChatMessage msg : messages) {
             if (msg instanceof SystemMessage) {
-                int msgTokens = getTextFromMessage(msg).length() / 4;
-                remainingTokens -= msgTokens;
+                remainingTokens -= estimateTokens(getTextFromMessage(msg));
                 truncated.add(msg);
             }
         }
@@ -616,12 +605,14 @@ public class ChatController {
                 .filter(m -> !(m instanceof SystemMessage))
                 .toList();
 
+        // 插入点固定在 system 消息之后（可能为 0，避免空列表 add(1) 越界）；newest 先插、older 顶右，自然恢复时序
+        final int insertPos = truncated.size();
         for (int i = nonSystemMessages.size() - 1; i >= 0; i--) {
             ChatMessage msg = nonSystemMessages.get(i);
-            int msgTokens = getTextFromMessage(msg).length() / 4;
+            int msgTokens = estimateTokens(getTextFromMessage(msg));
             if (remainingTokens >= msgTokens) {
                 remainingTokens -= msgTokens;
-                truncated.add(1, msg);
+                truncated.add(insertPos, msg);
             } else {
                 break;
             }
@@ -641,7 +632,7 @@ public class ChatController {
         // Collect messages to summarize (oldest first) until we hit half the budget
         for (ChatMessage msg : messages) {
             String text = getTextFromMessage(msg);
-            int msgTokens = text.length() / 4;
+            int msgTokens = estimateTokens(text);
             if (msg instanceof SystemMessage) {
                 keep.add(msg);
             } else if (accumulated + msgTokens <= targetTokens) {
@@ -671,7 +662,7 @@ public class ChatController {
         try {
             AiModelProvider provider = lightDao.load(new AiModelProvider(aiModel.getProviderId()));
             if (provider != null && provider.getIsDeleted() == 0 && provider.getEnableStatus() == 1) {
-                ChatModel chatModel = buildChatModel(provider, aiModel);
+                ChatModel chatModel = chatModelFactory.blocking(provider, aiModel);
                 if (chatModel != null) {
                     String summary = chatModel.chat(summaryInput.toString());
                     keep.add(0, new SystemMessage("Previous conversation summary: " + summary));
@@ -680,24 +671,29 @@ public class ChatController {
             }
         } catch (Exception e) {
             log.warn("Summarization failed, falling back to truncation", e);
-            // Fallback: keep only the last few messages
+            // Fallback: 重建列表只保留最近几条消息，避免与前面累积的 keep 重复添加 system 消息
+            List<ChatMessage> fallback = new ArrayList<>();
             int fallbackTokens = (int) (contextWindow * 0.8);
             for (ChatMessage msg : messages) {
                 if (msg instanceof SystemMessage) {
-                    keep.add(msg);
+                    fallbackTokens -= estimateTokens(getTextFromMessage(msg));
+                    fallback.add(msg);
                 }
             }
+            // 插入点固定在 system 消息之后（可能为 0，避免空列表 add(1) 越界）
+            final int fallbackInsertPos = fallback.size();
             for (int i = messages.size() - 1; i >= 0; i--) {
                 ChatMessage msg = messages.get(i);
                 if (msg instanceof SystemMessage) continue;
-                int msgTokens = getTextFromMessage(msg).length() / 4;
+                int msgTokens = estimateTokens(getTextFromMessage(msg));
                 if (fallbackTokens >= msgTokens) {
                     fallbackTokens -= msgTokens;
-                    keep.add(1, msg);
+                    fallback.add(fallbackInsertPos, msg);
                 } else {
                     break;
                 }
             }
+            return fallback;
         }
 
         // Add remaining messages that weren't summarized
@@ -748,48 +744,7 @@ public class ChatController {
             return null;
         }
         AiModelProvider provider = providers.getFirst();
-        return buildChatModel(provider, model);
-    }
-
-    private ChatModel buildChatModel(AiModelProvider provider, AiModel model) {
-        String type = provider.getProviderType();
-        String apiKey = ApiKeyCipher.decrypt(provider.getApiKey() != null ? provider.getApiKey() : "");
-        String baseUrl = provider.getApiBaseUrl();
-        String modelName = model.getModelName();
-
-        return switch (type.toLowerCase()) {
-            case "dashscope" -> QwenChatModel.builder()
-                    .apiKey(apiKey)
-                    .modelName(modelName)
-                    .build();
-            case "openai" -> OpenAiChatModel.builder()
-                    .apiKey(apiKey)
-                    .modelName(modelName)
-                    .baseUrl(baseUrl != null ? baseUrl : "https://api.openai.com")
-                    .build();
-            case "anthropic" -> AnthropicChatModel.builder()
-                    .apiKey(apiKey)
-                    .modelName(modelName)
-                    .baseUrl(baseUrl != null ? baseUrl : "https://api.anthropic.com")
-                    .build();
-            case "ollama" -> OllamaChatModel.builder()
-                    .baseUrl(baseUrl != null ? baseUrl : "http://localhost:11434")
-                    .modelName(modelName)
-                    .build();
-            case "gemini" -> GoogleAiGeminiChatModel.builder()
-                    .apiKey(apiKey)
-                    .modelName(modelName)
-                    .build();
-            case "custom" -> OpenAiChatModel.builder()
-                    .apiKey(apiKey)
-                    .modelName(modelName)
-                    .baseUrl(baseUrl)
-                    .build();
-            default -> {
-                log.warn("unsupported provider type: {}", type);
-                yield null;
-            }
-        };
+        return chatModelFactory.blocking(provider, model);
     }
 
     /**
@@ -829,13 +784,107 @@ public class ChatController {
                 log.setModelId(model.getId());
                 log.setModelName(model.getModelName());
             }
-            String prompt = extractLastUserText(request);
-            if (prompt != null) {
-                log.setPromptSnippet(prompt.length() > 500 ? prompt.substring(0, 500) : prompt);
+            // 审计留存的用户输入片段长度可配置；配置为 0 或负数时不留存原文（隐私脱敏）
+            int snippetLen = Solon.cfg().getInt("myapp.ai.audit-prompt-snippet-len", 500);
+            if (snippetLen > 0) {
+                String prompt = extractLastUserText(request);
+                if (prompt != null) {
+                    log.setPromptSnippet(prompt.length() > snippetLen ? prompt.substring(0, snippetLen) : prompt);
+                }
             }
             aiAuditLogService.record(log);
         } catch (Exception e) {
             ChatController.log.error("record chat audit failed", e);
+        }
+    }
+
+    /** 平台 API Key 明文前缀 */
+    private static final String API_KEY_PREFIX = "sk-cyr-";
+
+    /**
+     * 从请求头解析平台 API Key（Authorization: Bearer sk-cyr-xxx 或 X-Api-Key）；
+     * 非平台 Key 前缀（如登录用户的会话 Token）返回 null，不做 Key 级限流
+     */
+    private AiApiKey resolveApiKey(Context ctx) {
+        try {
+            String raw = ctx.header("Authorization");
+            if (raw != null && raw.startsWith("Bearer ")) {
+                raw = raw.substring(7).trim();
+            }
+            if (raw == null || !raw.startsWith(API_KEY_PREFIX)) {
+                raw = ctx.header("X-Api-Key");
+            }
+            if (raw == null || !raw.startsWith(API_KEY_PREFIX)) {
+                return null;
+            }
+            return aiApiKeyService.verifyPlainKey(raw);
+        } catch (Exception e) {
+            log.warn("resolve api key failed", e);
+            return null;
+        }
+    }
+
+    /**
+     * Token 估算：CJK 字符约 1.5 字符/token，其余约 4 字符/token（统一按 4 字符会对中文严重低估）
+     */
+    private int estimateTokens(String text) {
+        return TokenEstimator.estimate(text);
+    }
+
+    /**
+     * 估算整个请求（全部消息 + 系统提示词）的输入 Token，用于限流预判与用量兑底
+     */
+    private int estimateRequestTokens(ChatRequestDTO request) {
+        int total = 0;
+        if (request == null) {
+            return total;
+        }
+        if (request.getMessages() != null) {
+            for (ChatMessageDTO msg : request.getMessages()) {
+                total += estimateTokens(msg.getContent());
+            }
+        }
+        total += estimateTokens(request.getSystemPrompt());
+        return total;
+    }
+
+    /**
+     * 输出内容安全审核：已流式发出的内容无法撤回，
+     * 拦截/净化时通过 content_replaced 事件通知前端替换展示，并以净化后文本持久化与审计
+     */
+    private void applyOutputSafety(OutputStream out, StringBuilder responseContent,
+                                   String[] auditStatus, String[] auditError) {
+        if (responseContent.isEmpty()) {
+            return;
+        }
+        try {
+            ContentSafetyResult safety = contentSafetyService.check(responseContent.toString(), "output");
+            if (safety == null) {
+                return;
+            }
+            if (!safety.isAllowed()) {
+                auditStatus[0] = "blocked";
+                auditError[0] = "输出内容安全拦截: " + safety.getReason();
+                responseContent.setLength(0);
+                responseContent.append("内容因安全策略被拦截。");
+                writeSseData(out, JSONUtil.toJsonStr(Map.of(
+                        "type", "content_replaced",
+                        "content", responseContent.toString(),
+                        "error", auditError[0]
+                )));
+                out.flush();
+            } else if ("replace".equals(safety.getAction()) && safety.getSanitizedText() != null
+                    && !safety.getSanitizedText().equals(responseContent.toString())) {
+                responseContent.setLength(0);
+                responseContent.append(safety.getSanitizedText());
+                writeSseData(out, JSONUtil.toJsonStr(Map.of(
+                        "type", "content_replaced",
+                        "content", responseContent.toString()
+                )));
+                out.flush();
+            }
+        } catch (Exception e) {
+            log.error("output content safety check failed", e);
         }
     }
 }

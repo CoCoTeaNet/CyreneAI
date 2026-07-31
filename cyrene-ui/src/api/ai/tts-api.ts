@@ -9,7 +9,7 @@ export function synthesizeBlob(data: any) {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json;charset=utf-8',
-            "sa-token": userStore.userinfo.token || 'sa-token'
+            "Authorization": userStore.userinfo.token || ''
         },
         data: JSON.stringify(data),
         responseType: 'blob',

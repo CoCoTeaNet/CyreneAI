@@ -19,18 +19,18 @@
 
 ## B. Chat 核心（ChatController / useChatStream）
 
-- [ ] 🔴 **配额 / 限流完全未生效** — `governance/RateLimitService`、`AiQuotaAlertService.evaluate`、`AiApiKeyService.verifyPlainKey` 均**未被任何控制器调用**（全局搜索 0 引用）。`ChatController.stream` 未做任何配额/RPM/TPM/月度 Token 检查，治理层为死代码。需在 chat/agent 主链路接入 check + increment。
-- [ ] 🔴 **月度 Token 配额永不累加** — `RateLimitServiceImpl.increment` 只写 Redis 的 RPM/TPM，从不回写 `ai_api_key.tokens_used_this_month`，即使接入 check 也永远判定未超限。
-- [ ] 🟠 **输出内容未做安全审核** — `ChatController` 仅对输入调用 `contentSafetyService.check(...,"input")`，流式输出内容从不过滤，`ContentSafetyService` 的 `output` 分支形同虚设。
-- [ ] 🟠 **`latch.await()` 无超时** — `ChatController.stream`（L272）无超时等待，底层模型若不回调 onComplete/onError 将永久阻塞请求线程，存在线程耗尽风险。改为 `await(timeout)`。
-- [ ] 🟠 **未返回用量的供应商成本统计失效** — 仅当 `response.metadata().tokenUsage()` 非空才记录 token/成本（L210），Ollama/custom 等不回传用量时 token=0，成本与审计数据缺失。需按字符估算兜底。
-- [ ] 🟠 **消息持久化时序风险** — 用户消息在流式**完成后**才 `saveMessages`（L282），客户端中断或服务崩溃时用户消息丢失；停止流时服务端仍保存部分助手内容，与前端显示的 `[stopped]` 不一致。
-- [ ] 🟠 **截断逻辑越界风险** — `compressMessages` 在无 SystemMessage 且触发截断时 `truncated.add(1, msg)`（L624）对空列表插入索引 1，将抛 `IndexOutOfBoundsException`。
-- [ ] 🟡 **Token 估算过糙** — 统一按“4 字符/token”估算（L590），对中文严重低估，可能超出上下文窗口。
-- [ ] 🟡 **审计明文留存用户输入** — `recordAudit` 记录最多 500 字用户原文（`promptSnippet`），涉隐私，建议脱敏或可配置。
-- [ ] 🟡 **ChatModel 构建逻辑重复** — `buildStreamingChatModel` 与 `buildChatModel` 大量重复；`custom` 类型未校验 `baseUrl` 为空。建议抽工厂。
-- [ ] 🟠 **前端多模态图片丢失** — `composables/useChatStream.ts` 组装 payload 时只取 `{role, content}`（L67-70），丢弃图片 `contentParts`，导致图片对话在该链路失效（后端已支持 `image_url`）。
-- [ ] 🟠 **Token 请求头不一致** — 前端 `axios-util.ts` / `useChatStream.ts` 使用 `sa-token` 头，而 `app.yml` 中 `sa-token.token-name: Authorization`，agent-chat 又从未写入的 `localStorage['sa-token']` 取值 → 认证头混乱、agent 对话请求无有效 token。统一为 `Authorization`。
+- [x] 🔴 **配额 / 限流完全未生效** — `governance/RateLimitService`、`AiQuotaAlertService.evaluate`、`AiApiKeyService.verifyPlainKey` 均**未被任何控制器调用**（全局搜索 0 引用）。`ChatController.stream` 未做任何配额/RPM/TPM/月度 Token 检查，治理层为死代码。需在 chat/agent 主链路接入 check + increment。
+- [x] 🔴 **月度 Token 配额永不累加** — `RateLimitServiceImpl.increment` 只写 Redis 的 RPM/TPM，从不回写 `ai_api_key.tokens_used_this_month`，即使接入 check 也永远判定未超限。
+- [x] 🟠 **输出内容未做安全审核** — `ChatController` 仅对输入调用 `contentSafetyService.check(...,"input")`，流式输出内容从不过滤，`ContentSafetyService` 的 `output` 分支形同虚设。
+- [x] 🟠 **`latch.await()` 无超时** — `ChatController.stream`（L272）无超时等待，底层模型若不回调 onComplete/onError 将永久阻塞请求线程，存在线程耗尽风险。改为 `await(timeout)`。
+- [x] 🟠 **未返回用量的供应商成本统计失效** — 仅当 `response.metadata().tokenUsage()` 非空才记录 token/成本（L210），Ollama/custom 等不回传用量时 token=0，成本与审计数据缺失。需按字符估算兑底。
+- [x] 🟠 **消息持久化时序风险** — 用户消息在流式**完成后**才 `saveMessages`（L282），客户端中断或服务崩溃时用户消息丢失；停止流时服务端仍保存部分助手内容，与前端显示的 `[stopped]` 不一致。
+- [x] 🟠 **截断逻辑越界风险** — `compressMessages` 在无 SystemMessage 且触发截断时 `truncated.add(1, msg)`（L624）对空列表插入索引 1，将抛 `IndexOutOfBoundsException`。
+- [x] 🟡 **Token 估算过糙** — 统一按“4 字符/token”估算（L590），对中文严重低估，可能超出上下文窗口。
+- [x] 🟡 **审计明文留存用户输入** — `recordAudit` 记录最多 500 字用户原文（`promptSnippet`），涉隐私，建议脱敏或可配置。
+- [x] 🟡 **ChatModel 构建逻辑重复** — `buildStreamingChatModel` 与 `buildChatModel` 大量重复；`custom` 类型未校验 `baseUrl` 为空。建议抽工厂。
+- [x] 🟠 **前端多模态图片丢失** — `composables/useChatStream.ts` 组装 payload 时只取 `{role, content}`（L67-70），丢弃图片 `contentParts`，导致图片对话在该链路失效（后端已支持 `image_url`）。
+- [x] 🟠 **Token 请求头不一致** — 前端 `axios-util.ts` / `useChatStream.ts` 使用 `sa-token` 头，而 `app.yml` 中 `sa-token.token-name: Authorization`，agent-chat 又从未写入的 `localStorage['sa-token']` 取值 → 认证头混乱、agent 对话请求无有效 token。统一为 `Authorization`。
 
 ## C. Agent 与工具框架
 

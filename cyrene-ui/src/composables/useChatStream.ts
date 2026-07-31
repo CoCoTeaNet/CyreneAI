@@ -10,10 +10,18 @@ export interface ChatSource {
     score?: number | null;
 }
 
+export interface ChatContentPart {
+    type: string;
+    text?: string;
+    imageUrl?: string;
+    detail?: string;
+}
+
 export interface ChatMessage {
     id?: string;
     role: ChatRole;
     content: string;
+    contentParts?: ChatContentPart[];
     sources?: ChatSource[];
     tokenUsage?: {
         promptTokens: number;
@@ -64,14 +72,16 @@ export function useChatStream() {
         }
         abortController.value = new AbortController();
 
+        // 保留多模态 contentParts（图片等），后端已支持 image_url 解析
         const messagePayload = messages.value.slice(0, -1).map(m => ({
             role: m.role,
-            content: m.content
+            content: m.content,
+            ...(m.contentParts && m.contentParts.length ? { contentParts: m.contentParts } : {})
         }));
 
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
         if (userStore.userinfo.token) {
-            headers['sa-token'] = userStore.userinfo.token;
+            headers['Authorization'] = userStore.userinfo.token;
         }
 
         const body: Record<string, any> = {
@@ -135,12 +145,11 @@ export function useChatStream() {
                         if (parsed.type === 'sources') {
                             assistantMsg.sources = Array.isArray(parsed.sources) ? parsed.sources : [];
                             messages.value = [...messages.value];
-                        }
-                        if (parsed.content) {
-                            assistantMsg.content += parsed.content;
+                        } else if (parsed.type === 'content_replaced') {
+                            // 输出内容安全审核：用净化/拦截后的全文替换已展示内容
+                            assistantMsg.content = parsed.content ?? '';
                             messages.value = [...messages.value];
-                        }
-                        if (parsed.type === 'token_usage') {
+                        } else if (parsed.type === 'token_usage') {
                             assistantMsg.tokenUsage = {
                                 promptTokens: parsed.promptTokens,
                                 completionTokens: parsed.completionTokens,
@@ -148,11 +157,13 @@ export function useChatStream() {
                                 cost: parsed.cost
                             };
                             messages.value = [...messages.value];
-                        }
-                        if (parsed.error) {
+                        } else if (parsed.error) {
                             assistantMsg.content = `Error: ${parsed.error}`;
                             messages.value = [...messages.value];
                             streaming.value = false;
+                        } else if (parsed.content) {
+                            assistantMsg.content += parsed.content;
+                            messages.value = [...messages.value];
                         }
                     } catch (parseError) {
                         // 忽略解析错误

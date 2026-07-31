@@ -73,6 +73,7 @@ import {useRoute, useRouter} from "vue-router";
 import {UserFilled, Promotion} from "@element-plus/icons-vue";
 import {marked} from "marked";
 import hljs from "highlight.js";
+import {useUserStore} from "@/stores/user";
 import 'highlight.js/styles/github-dark.css';
 
 marked.setOptions({
@@ -135,13 +136,13 @@ const sendMessage = async () => {
       .map(m => ({role: m.role, content: m.content}));
 
   try {
-    const token = localStorage.getItem('sa-token') || '';
+    // 与后端 sa-token.token-name: Authorization 保持一致，从用户仓库取 Token
+    const token = useUserStore().userinfo.token || '';
     const response = await fetch('/api/ai/agent/chat', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': token,
-        'satoken': token
+        'Authorization': token
       },
       body: JSON.stringify({
         agentId: agentId.value,
