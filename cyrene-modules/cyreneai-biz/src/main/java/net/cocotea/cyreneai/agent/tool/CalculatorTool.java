@@ -4,10 +4,7 @@ import net.cocotea.cyreneai.agent.ToolExecutor;
 import net.cocotea.cyreneai.agent.ToolSpecification;
 import org.noear.solon.annotation.Component;
 
-import javax.script.ScriptEngine;
-import javax.script.ScriptEngineManager;
 import java.util.ArrayDeque;
-import java.util.Arrays;
 import java.util.Deque;
 import java.util.Map;
 import java.util.function.DoubleUnaryOperator;
@@ -17,18 +14,6 @@ public class CalculatorTool implements ToolExecutor {
 
     private static final String NAME = "calculator";
     private static final String DESCRIPTION = "执行数学表达式计算，支持 +, -, *, /, ^, sin, cos, tan, sqrt, log, abs, round, floor, ceil 等运算";
-
-    private final ScriptEngine engine;
-
-    public CalculatorTool() {
-        ScriptEngineManager manager = new ScriptEngineManager();
-        ScriptEngine e = null;
-        for (String name : Arrays.asList("graal.js", "JavaScript", "js", "Nashorn")) {
-            e = manager.getEngineByName(name);
-            if (e != null) break;
-        }
-        this.engine = e;
-    }
 
     @Override
     public ToolSpecification getSpecification() {
@@ -51,17 +36,14 @@ public class CalculatorTool implements ToolExecutor {
             return "错误: 表达式不能为空";
         }
         try {
-            if (engine != null) {
-                Object result = engine.eval(expression);
-                return expression + " = " + result;
-            }
+            // 安全考虑：不使用 ScriptEngine（JS 注入风险），仅用内置纯数学表达式解析器
             double result = eval(expression);
             if (result == Math.floor(result) && !Double.isInfinite(result)) {
                 return expression + " = " + (long) result;
             }
             return expression + " = " + result;
         } catch (Exception e) {
-            return "计算错误: " + e.getMessage() + "\n提示: JDK 15+ 不再内置 JavaScript 引擎，请添加 GraalVM JS 依赖以支持复杂表达式";
+            return "计算错误: " + e.getMessage();
         }
     }
 
@@ -87,7 +69,8 @@ public class CalculatorTool implements ToolExecutor {
         for (int i = 0; i < expr.length(); i++) {
             char c = expr.charAt(i);
             if (Character.isWhitespace(c)) continue;
-            if (Character.isLetter(c) || c == '.') {
+            // 数字、字母（函数/常量名）与小数点均计入当前 token
+            if (Character.isLetterOrDigit(c) || c == '.') {
                 buf.append(c);
             } else {
                 if (!buf.isEmpty()) {

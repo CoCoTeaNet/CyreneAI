@@ -1,5 +1,6 @@
 package net.cocotea.cyreneai.service.rag;
 
+import net.cocotea.cyreneai.util.SafeHttpUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -12,9 +13,13 @@ import java.io.IOException;
 public class WebScraperService {
 
     public ScrapedResult scrape(String url) throws IOException {
+        // SSRF 防护：仅允许 http/https 且禁止内网/保留地址
+        SafeHttpUtils.validateUrl(url);
         Document doc = Jsoup.connect(url)
                 .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
                 .timeout(15000)
+                .followRedirects(false)
+                .maxBodySize((int) SafeHttpUtils.DEFAULT_MAX_BYTES)
                 .get();
 
         String title = doc.title();

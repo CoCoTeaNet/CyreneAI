@@ -26,16 +26,20 @@ public class ConversationController {
     @Inject
     private AiConversationService conversationService;
 
+    private BigInteger currentUserId() {
+        return BigInteger.valueOf(StpUtil.getLoginIdAsLong());
+    }
+
     @Get @Mapping("/list")
     public ApiResult<List<AiConversation>> list() {
-        BigInteger userId = BigInteger.valueOf(StpUtil.getLoginIdAsLong());
+        BigInteger userId = currentUserId();
         List<AiConversation> conversations = conversationService.listByUserId(userId);
         return ApiResult.ok(conversations);
     }
 
     @Post @Mapping("/create")
     public ApiResult<AiConversation> create(@Body AiConversation conversation) {
-        BigInteger userId = BigInteger.valueOf(StpUtil.getLoginIdAsLong());
+        BigInteger userId = currentUserId();
         conversation.setUserId(userId);
         AiConversation created = conversationService.create(conversation);
         return ApiResult.ok(created);
@@ -43,36 +47,46 @@ public class ConversationController {
 
     @Post @Mapping("/delete/{id}")
     public ApiResult<?> delete(@Param("id") BigInteger id) {
+        conversationService.checkOwnership(id, currentUserId());
         conversationService.deleteById(id);
         return ApiResult.ok();
     }
 
     @Get @Mapping("/messages")
     public ApiResult<List<AiMessage>> messages(@Param("conversationId") BigInteger conversationId) {
+        conversationService.checkOwnership(conversationId, currentUserId());
         List<AiMessage> messages = conversationService.listMessages(conversationId);
         return ApiResult.ok(messages);
     }
 
     @Post @Mapping("/saveMessage")
     public ApiResult<AiMessage> saveMessage(@Body AiMessage message) {
+        conversationService.checkOwnership(message.getConversationId(), currentUserId());
         AiMessage saved = conversationService.saveMessage(message);
         return ApiResult.ok(saved);
     }
 
     @Post @Mapping("/deleteMessage/{id}")
     public ApiResult<?> deleteMessage(@Param("id") BigInteger id) {
+        AiMessage message = conversationService.findMessageById(id);
+        if (message == null) {
+            return ApiResult.error("消息不存在");
+        }
+        conversationService.checkOwnership(message.getConversationId(), currentUserId());
         conversationService.deleteMessage(id);
         return ApiResult.ok();
     }
 
     @Post @Mapping("/clearMessages/{conversationId}")
     public ApiResult<?> clearMessages(@Param("conversationId") BigInteger conversationId) {
+        conversationService.checkOwnership(conversationId, currentUserId());
         conversationService.clearMessages(conversationId);
         return ApiResult.ok();
     }
 
     @Post @Mapping("/share/{conversationId}")
     public ApiResult<Map<String, String>> share(@Param("conversationId") BigInteger conversationId) {
+        conversationService.checkOwnership(conversationId, currentUserId());
         String token = conversationService.shareConversation(conversationId);
         return ApiResult.ok(Map.of("token", token, "url", "/api/ai/conversation/shared/" + token));
     }
@@ -89,12 +103,14 @@ public class ConversationController {
     @Post @Mapping("/truncateMessages/{conversationId}/{afterMessageId}")
     public ApiResult<?> truncateMessages(@Param("conversationId") BigInteger conversationId,
                                          @Param("afterMessageId") BigInteger afterMessageId) {
+        conversationService.checkOwnership(conversationId, currentUserId());
         conversationService.truncateMessages(conversationId, afterMessageId);
         return ApiResult.ok();
     }
 
     @Get @Mapping("/export")
     public ApiResult<?> export(@Param("conversationId") BigInteger conversationId) {
+        conversationService.checkOwnership(conversationId, currentUserId());
         AiConversation conversation = conversationService.findById(conversationId);
         if (conversation == null) {
             return ApiResult.error("Conversation not found");
@@ -113,7 +129,7 @@ public class ConversationController {
         try {
             AiConversation conversation = new AiConversation();
             conversation.setTitle((String) data.get("title"));
-            BigInteger userId = BigInteger.valueOf(StpUtil.getLoginIdAsLong());
+            BigInteger userId = currentUserId();
             conversation.setUserId(userId);
             AiConversation saved = conversationService.create(conversation);
 

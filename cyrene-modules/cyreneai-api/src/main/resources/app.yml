@@ -35,7 +35,8 @@ myapp:
   password: admin#123456
   # 密码加密的加盐
   password-salt: Admin@salt
-  # AI 提供商 API 密钥 AES 加密主密钥（生产环境务必覆盖为强随机值；轮换后需同步更新）
+  # AI 提供商 API 密钥 AES-256-GCM 加密主密钥
+  # ⚠ 当前值与源码内置默认值相同（仅供开发环境），生产环境务必通过环境变量/外部配置覆盖为强随机密钥，否则启动时会输出告警；轮换后需同步重新加密存量密钥
   ai:
     api-key-secret: CyreneAI@ApiKey$Secret$V1
   # 开启缓存

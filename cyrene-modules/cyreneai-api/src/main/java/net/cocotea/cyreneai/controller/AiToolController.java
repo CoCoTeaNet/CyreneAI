@@ -76,6 +76,7 @@ public class AiToolController {
 
     @Mapping("/execute")
     @Post
+    @SaCheckRole(value = {"role:super:admin", "role:simple:admin"}, mode = SaMode.OR)
     public ApiResult<String> execute(@Validated @Body ToolExecuteDTO dto) {
         String result = toolExecutionService.executeBuiltin(dto.getToolName(), dto.getArguments());
         return ApiResult.ok(result);

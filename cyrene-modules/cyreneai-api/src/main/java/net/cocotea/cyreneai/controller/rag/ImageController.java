@@ -33,6 +33,7 @@ public class ImageController {
 
     @Post
     @Mapping("/generate")
+    @SaCheckRole(value = {"role:super:admin", "role:simple:admin"}, mode = SaMode.OR)
     public ApiResult<String> generate(@Validated @Body ImageGenerateDTO param) {
         String url = imageService.generate(param);
         return ApiResult.ok(url);

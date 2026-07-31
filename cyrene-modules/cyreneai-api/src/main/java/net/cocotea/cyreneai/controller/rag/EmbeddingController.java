@@ -1,5 +1,7 @@
 package net.cocotea.cyreneai.controller.rag;
 
+import cn.dev33.satoken.annotation.SaCheckRole;
+import cn.dev33.satoken.annotation.SaMode;
 import net.cocotea.cyreneadmin.model.BusinessException;
 import net.cocotea.cyreneai.model.dto.AiEmbeddingRequestDTO;
 import net.cocotea.cyreneai.model.vo.AiEmbeddingResultVO;
@@ -27,6 +29,7 @@ public class EmbeddingController {
 
     @Post
     @Mapping("/embeddings")
+    @SaCheckRole(value = {"role:super:admin", "role:simple:admin"}, mode = SaMode.OR)
     public ApiResult<AiEmbeddingResultVO> embeddings(@Validated @Body AiEmbeddingRequestDTO param) {
         if (param.getInput() == null || param.getInput().isEmpty()) {
             throw new BusinessException("input 不能为空");

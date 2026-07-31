@@ -1,260 +1,94 @@
-# CyreneAI — AI Feature Roadmap
+# 🔍 业务功能问题与优化审计
 
-## Overview
-该项目是一个基于 Solon + Vue3 的 AI 平台，当前已完成基础 Chat 功能骨架，以下列出需要补充的 AI 基础功能，按阶段划分。
+> 本章节基于对现有业务代码的静态审计，记录**真实存在的问题**（缺陷 / 安全漏洞 / 逻辑错误 / 性能与资源问题 / 错误处理缺陷）及优化点。
+> 优先级：🔴 高危（安全或功能性阻断）｜🟠 中（功能受损 / 明显隐患）｜🟡 低（健壮性 / 体验 / 优化）。
+> 前提：项目已配置全局登录拦截器（`WebMvcConfig` 的 `SaTokenInterceptor`，仅放行 login/captcha/dashboard/chat.stream 等少数路径），故所有 `/ai/**` 端点默认需登录；下文“缺认证”类问题多指缺少**角色校验 / 资源归属校验**，而非完全无认证。
 
----
+## A. 安全：认证 / 授权 / 注入
 
-## Phase 0 — 已完成（Chat 基础）
-- [x] `POST /ai/chat/stream` SSE 流式聊天接口 ✔
-- [x] `GET /ai/model/listEnabled` 已启用模型列表 ✔
-- [x] 模型供应商 CRUD（前端 + 后端） ✔
-- [x] 模型 CRUD（前端 + 后端） ✔
-- [x] Chat UI（Markdown 渲染、代码高亮、流式展示） ✔
-- [x] `useChatStream` 流式 Composable ✔
-- [x] 基础路由与菜单 ✔
+- [x] 🔴 **代码执行工具无沙箱（RCE）** — `agent/tool/CodeExecutionTool.java` 使用 `engine.eval(code)` 直接执行脚本，可访问 Java 反射/`Runtime.exec`，等价任意命令执行；且 `timeout_ms` 声明但未强制，ScriptEngine 为单例线程不安全。需替换为真正沙箱（GraalVM `js` 且 `allowAllAccess(false)` + 资源/时间限制）或直接下线该工具。
+- [x] 🔴 **`/ai/tool/execute` 缺少角色校验** — `controller/AiToolController.java` 的 execute 端点无 `@SaCheckRole`，任何登录用户可触发 `code_execution` 工具 = RCE。补充管理员角色校验并对内置危险工具做白名单。
+- [x] 🔴 **计算器 JS 注入** — `agent/tool/CalculatorTool.java` 用 `engine.eval` 执行表达式，可注入任意 JS；同时 fallback 分词器（L84-104）只收集字母与点、**丢弃数字**，导致降级解析器完全不可用。改用纯数学表达式解析库（如 exp4j）。
+- [x] 🔴 **自定义工具 SSRF** — `agent/ToolExecutionService.java#executeCustom`（L91-134）对用户配置 URL 无任何校验，可访问内网/元数据地址；且 GET 参数未 URL 编码。需加 URL 白名单/内网地址拦截 + 参数编码。
+- [x] 🔴 **Web 爬取 / STT SSRF** — `service/rag/WebScraperService.java#scrape`、`service/rag/impl/SttServiceImpl.java`（`HttpUtil.downloadBytes(audioUrl)`）对外部 URL 无校验且无大小限制，存在 SSRF + 大响应内存耗尽。统一封装带内网拦截与大小上限的下载器。
+- [x] 🟠 **Agent Chat 接口缺角色/权限校验** — `controller/AgentChatController.java` `/ai/agent/chat` 已被全局登录拦截器保护（非“无认证”），但无 `@SaCheckRole`，任何登录用户可调用任意 Agent（含 `code_execution` 工具）。建议补角色校验并对危险工具做白名单。
+- [x] 🔴 **会话接口越权（IDOR）** — `controller/ConversationController.java` 的 `delete/messages/saveMessage/deleteMessage/clearMessages/share/truncateMessages/export` 全部只按传入 id 操作，**不校验会话归属当前用户**，任意用户可读取/删除他人会话。需在 Service 层统一按 `userId` 过滤。
+- [x] 🔴 **API Key 加密使用公开已知密钥** — `util/ApiKeyCipher.java` 未配置 `myapp.ai.api-key-secret` 时回退源码内置常量 `DEFAULT_SECRET`；而 cyreneai-api 模块 `app.yml` 配置的值恰好**等于该默认常量**、starter 模块 `app.yml` 又未配置 → 供应商密钥实际以公开已知密钥加密，加密形同虚设；且 Hutool `SecureUtil.aes` 默认 ECB 模式不安全。生产强制要求外部配置强随机密钥并改用 GCM/CBC+IV。
+- [x] 🟠 **API Key 管理接口鉴权不一致** — `controller/AiApiKeyController.java` 的 `listByPage`、`usage/{apiKeyId}` 缺少 `@SaCheckRole`，普通用户可列出全部密钥元数据与用量，且 usage 无归属校验（IDOR）。
+- [x] 🟠 **RAG / 图片 / Embedding 端点缺角色校验** — 文档抓取(`/ai/webScraper/scrape`)、embeddings(`/ai/embeddings`)、图片生成(`/ai/image/generate`)等端点已受全局登录拦截，但缺 `@SaCheckRole`（同模块其他管理端点已加），建议统一补齐角色校验。
 
----
+## B. Chat 核心（ChatController / useChatStream）
 
-## 🔧 Phase 1 — Chat 功能完善（修复当前问题）
+- [ ] 🔴 **配额 / 限流完全未生效** — `governance/RateLimitService`、`AiQuotaAlertService.evaluate`、`AiApiKeyService.verifyPlainKey` 均**未被任何控制器调用**（全局搜索 0 引用）。`ChatController.stream` 未做任何配额/RPM/TPM/月度 Token 检查，治理层为死代码。需在 chat/agent 主链路接入 check + increment。
+- [ ] 🔴 **月度 Token 配额永不累加** — `RateLimitServiceImpl.increment` 只写 Redis 的 RPM/TPM，从不回写 `ai_api_key.tokens_used_this_month`，即使接入 check 也永远判定未超限。
+- [ ] 🟠 **输出内容未做安全审核** — `ChatController` 仅对输入调用 `contentSafetyService.check(...,"input")`，流式输出内容从不过滤，`ContentSafetyService` 的 `output` 分支形同虚设。
+- [ ] 🟠 **`latch.await()` 无超时** — `ChatController.stream`（L272）无超时等待，底层模型若不回调 onComplete/onError 将永久阻塞请求线程，存在线程耗尽风险。改为 `await(timeout)`。
+- [ ] 🟠 **未返回用量的供应商成本统计失效** — 仅当 `response.metadata().tokenUsage()` 非空才记录 token/成本（L210），Ollama/custom 等不回传用量时 token=0，成本与审计数据缺失。需按字符估算兜底。
+- [ ] 🟠 **消息持久化时序风险** — 用户消息在流式**完成后**才 `saveMessages`（L282），客户端中断或服务崩溃时用户消息丢失；停止流时服务端仍保存部分助手内容，与前端显示的 `[stopped]` 不一致。
+- [ ] 🟠 **截断逻辑越界风险** — `compressMessages` 在无 SystemMessage 且触发截断时 `truncated.add(1, msg)`（L624）对空列表插入索引 1，将抛 `IndexOutOfBoundsException`。
+- [ ] 🟡 **Token 估算过糙** — 统一按“4 字符/token”估算（L590），对中文严重低估，可能超出上下文窗口。
+- [ ] 🟡 **审计明文留存用户输入** — `recordAudit` 记录最多 500 字用户原文（`promptSnippet`），涉隐私，建议脱敏或可配置。
+- [ ] 🟡 **ChatModel 构建逻辑重复** — `buildStreamingChatModel` 与 `buildChatModel` 大量重复；`custom` 类型未校验 `baseUrl` 为空。建议抽工厂。
+- [ ] 🟠 **前端多模态图片丢失** — `composables/useChatStream.ts` 组装 payload 时只取 `{role, content}`（L67-70），丢弃图片 `contentParts`，导致图片对话在该链路失效（后端已支持 `image_url`）。
+- [ ] 🟠 **Token 请求头不一致** — 前端 `axios-util.ts` / `useChatStream.ts` 使用 `sa-token` 头，而 `app.yml` 中 `sa-token.token-name: Authorization`，agent-chat 又从未写入的 `localStorage['sa-token']` 取值 → 认证头混乱、agent 对话请求无有效 token。统一为 `Authorization`。
 
-### 1.1 Sa-Token 认证放行
-- [x] `app.yml` 中为 `/ai/chat/stream`、`/ai/chat/ping`、`/ai/model/listEnabled` 添加 Sa-Token exclude ✔
-- [x] `useChatStream.ts` 流式请求携带 auth token（当前使用裸 `fetch()` 未带 token） ✔
+## C. Agent 与工具框架
 
-### 1.2 多模型供应商支持（后端）
-- [x] **OpenAI** — `OpenAiStreamingChatModel` 适配 ✔
-- [x] **Anthropic** — `AnthropicStreamingChatModel` 适配 ✔
-- [x] **Ollama** — `OllamaStreamingChatModel` 适配（本地模型） ✔
-- [x] **Google Gemini** — `GeminiStreamingChatModel` 适配 ✔
-- [x] **自定义 OpenAI 兼容 API** — 通过 `baseUrl` + `apiKey` 动态构建 ✔
-- [x] **工厂模式** 重构 `buildStreamingChatModel()`，根据 `providerType` 路由到对应的 ChatModel 构建器 ✔
+- [ ] 🔴 **工具依赖注入失效导致 NPE** — 工具经反射 `newInstance()` 实例化（`ToolExecutionService`），`KnowledgeBaseTool` 等的 `@Inject` 字段为 null，调用即 NPE。改为从容器获取 Bean 或手动注入依赖。
+- [ ] 🟠 **无重复工具调用检测** — `AgentService` ReAct 循环无重复调用/环路检测，模型可能反复调用同一工具直至 `MAX_ITERATIONS`（=10）耗尽。
+- [ ] 🟠 **脆弱的 JSON 提取** — `AgentService.extractJsonBlock` 用 `indexOf('{')`/`lastIndexOf('}')` 提取工具调用，含代码块/多 JSON 时易解析错误。
+- [ ] 🟠 **SSE 流未在 finally 关闭** — `AgentChatController` 的 OutputStream 无 finally 兜底关闭，异常路径可能泄漏连接。
+- [ ] 🟠 **同步阻塞占用 SSE 线程** — `AgentService` 中 `chatModel.chat(messages)` 同步阻塞在 SSE 处理线程内，并发下线程占用高。
+- [ ] 🟡 **WebSearchTool 有请求无解析** — `agent/tool/WebSearchTool.java` 虽发起 Google/Bing 请求但从不解析返回 HTML，仅回固定提示文本，等同占位 stub，与 README“网页搜索”不符。
+- [ ] 🟡 **WeatherTool 空值风险** — 直接访问外部 JSON 字段，字段缺失时 NPE。
 
-### 1.3 对话参数控制
-- [x] `ChatRequestDTO` 增加 `temperature`、`topP`、`maxTokens`、`systemPrompt` 字段 ✔
-- [x] 前端聊天界面增加参数调节面板（折叠式） ✔
-- [x] 后端将参数透传给底层 ChatModel ✔
+## D. RAG / 知识库 / 文档 / 向量
 
-### 1.4 Token 用量统计
-- [x] 每次 Chat 完成时记录 `promptTokens`、`completionTokens`、`totalTokens` ✔
-- [x] 关联模型定价计算本次花费 ✔
-- [x] 前端展示 Token 用量（每次回复尾部小字） ✔
+- [ ] 🔴 **文档文件路径不匹配导致索引永久失败** — `service/rag/impl/DocumentServiceImpl.java` L62 用 `System.currentTimeMillis()+"_"+fileName` 落盘，L73 又调用一次 `System.currentTimeMillis()` 生成入库 `filePath`，两个时间戳不同 → DB 记录路径与磁盘文件永不一致，reIndex/processDocument 必然失败。改为复用同一变量。
+- [ ] 🔴 **文档上传路径遍历** — `DocumentServiceImpl` 未净化 `fileName`，`../` 可写出上传目录；同时缺文件大小/类型校验。
+- [ ] 🟠 **无界线程创建** — `DocumentServiceImpl`（L86、L199）用 `new Thread().start()` 处理索引，高并发下线程暴涨。改用受控线程池。
+- [ ] 🟠 **知识库列表全表加载内存分页** — `KnowledgeBaseServiceImpl.listByPage`（L92-103）加载全表后内存分页，数据量大时 OOM/慢。改用 DB 分页。
+- [ ] 🟠 **检索 N+1 查询** — `KnowledgeBaseServiceImpl.retrieve`（L158-161）对 docIds 逐条 `load` 查询文档名（`listEnabled` 无此问题），改为批量 IN 查询或联表。
+- [ ] 🟠 **向量批量写入逐条 INSERT** — `service/rag/impl/PgVectorStore.java#addChunks`（L34-41）每 chunk 单独 INSERT，改批量写入。
+- [ ] 🟠 **文本分块死循环风险** — `service/rag/TextSplitter.java#splitBySize`（L22）`start += chunkSize - overlap`，当 `overlap >= chunkSize` 时步进 ≤0，死循环。需校验 overlap < chunkSize。
+- [ ] 🟠 **Embedding 模型缓存永不失效** — `EmbeddingServiceImpl` 的 `modelCache` 无过期，供应商密钥/配置更新后仍用旧实例。加入 TTL / 基于 updateTime 失效。
+- [ ] 🟠 **图片服务错误当成功返回** — `ImageServiceImpl` 将错误信息作为普通字符串返回，控制器包成 `ApiResult.ok`，前端无法区分错误与图片 URL。应抛异常/返回错误码。
+- [ ] 🟡 **TTS 格式与扩展名不符** — `TtsServiceImpl` DashScope 合成 WAV（L172）却存为 `.mp3`（L237）；且 `uploads/audio/tts/` 音频无清理策略，长期累积。
+- [ ] 🟡 **STT 无响应大小限制** — `readAllBytes`（L84）无上限，超大音频可致 OOM。
+- [ ] 🟡 **synthesize-url 未返回音频地址** — TTS 的 url 合成接口未回传可访问的音频 URL。
 
-### 1.5 消息编辑 / 删除
-- [x] 用户可编辑已发送的消息（重新生成回复） ✔
-- [x] 用户可删除单条消息或清空当前对话 ✔
-- [x] 删除后重新生成保持对话上下文一致性 ✔
+## E. 治理（审核 / 审计 / 密钥）
 
-### 1.6 对话历史 - 左侧面板
-- [x] 左侧对话列表面板（已提及但未实现） ✔
-- [x] 新建对话、切换对话、删除对话 ✔
-- [x] 对话标题自动生成（基于首条消息） ✔
+- [ ] 🟠 **外部 Moderation 未实现** — `ContentSafetyServiceImpl`（L86-89）对 `openai_moderation`/`dashscope` 仅打日志未实现，配置此类规则将静默放行，与“Moderation API”宣称不符。
+- [ ] 🟠 **审核 replace 动作破坏整条文本** — `ContentSafetyServiceImpl`（L94）命中规则 replace 时 `working = "***"`，把整条消息替换为 `***` 而非仅替换命中片段。
+- [ ] 🟠 **敏感词检查大小写敏感 + 无缓存 + 线性扫描** — `contains(word)` 区分大小写可被绕过；每次请求 `listEnabled()` 全量查库 + 逐词 `contains`，性能差。改为忽略大小写、缓存词表、Aho-Corasick。
+- [ ] 🟠 **限流计数非原子** — `RateLimitServiceImpl` 用 get→save 两步更新计数（非原子），高并发超发；应改用 Redis `INCR/INCRBY + EXPIRE`。
+- [ ] 🟡 **配额告警仅打日志** — `AiQuotaAlertServiceImpl.evaluate` 命中后 TODO 未接入 email/webhook，告警无实际触达（且该方法本身未被调用）。
 
----
+## F. 前端（Vue3 / TS）
 
-## 🗄 Phase 2 — 对话 & 会话管理
+- [ ] 🔴 **Markdown 渲染 XSS** — `views/ai/chat/index.vue`、`views/ai/agent-chat/index.vue` 对 `marked` 输出直接 `v-html` 未经 DOMPurify 消毒，模型/知识库返回的恶意内容可致存储型 XSS。渲染前统一 sanitize。
+- [ ] 🔴 **路由守卫无登录校验** — `router/index.ts` `beforeEach` 仅处理 `/` 重定向，未校验登录态，未登录可直接进入所有 admin 路由。
+- [ ] 🟠 **axios 顶层调用 useUserStore** — `utils/axios-util.ts` L6 在模块顶层 `useUserStore()`，若在 Pinia 激活前被导入将抛异常。应在函数内调用。
+- [ ] 🟠 **maxContentLength=2000** — `axios-util.ts` L53 限制响应 2000 字节（Node 适配器语义），配置具误导性，浏览器端虽多被忽略，建议移除或设合理值。
+- [ ] 🟠 **transformResponse 无 try-catch** — `axios-util.ts` L32 `JSON.parse` 无保护，后端返回非 JSON（HTML 错误页/空体）时抛未捕获异常；`validateStatus` 仅允许 200，其余状态无结构化处理。
+- [ ] 🟠 **agent-chat 无 AbortController** — `views/ai/agent-chat/index.vue` fetch 无中断控制，组件卸载后仍写入已销毁组件状态，存在泄漏；且未检查 `response.ok`。
+- [ ] 🟠 **reqCommonFeedback 无错误回调** — `api/ApiFeedback.ts` 请求失败时 loading 无法复位，页面可能卡在加载态。
+- [ ] 🟠 **marked 已废弃 highlight 选项** — `chat/index.vue` L206-215 使用 marked v12+ 已移除的同步 `highlight` 回调，代码高亮实际失效。改用 `marked-highlight`。
+- [ ] 🟡 **批量删除未校验空选择** — `model/tool/agent` 三处 `onDeleteBatch` 未判空选中项，空数组也会发起删除请求。
+- [ ] 🟡 **流式每 chunk 全量拷贝数组** — `useChatStream.ts` / `chat/index.vue` 每个 chunk `messages.value = [...messages.value]`，长对话性能差。
+- [ ] 🟡 **`response.body!` 非空断言** — `useChatStream.ts` L111 body 可能为 null，运行时崩溃风险。
+- [ ] 🟡 **localStorage 明文 token** — `stores/user.ts` token 明文存 localStorage，结合 XSS 可被窃取。
+- [ ] 🟡 **App.vue 恢复缓存无 try-catch** — `App.vue` L11 `JSON.parse(localStorage)` 无保护，数据损坏致白屏。
+- [ ] 🟡 **中文输入法误发送** — `chat/index.vue` L176 `@keydown.enter.exact` 未处理 IME 组合，中文候选确认会误触发发送。
+- [ ] 🟡 **列表以 index 为 key** — `chat/index.vue` `v-for :key="idx"`，删除消息后 key 变化引发不必要 DOM 重建。
+- [ ] 🟡 **pageSize=999 模拟全量** — `agent/index.vue` 加载模型/工具用 `pageSize:999`，数据量大时丢数据/性能差。
+- [ ] 🟡 **menu store 类型不安全** — `stores/menu.ts` `tabItems/menus` 无泛型，推断为 `never[]`。
+- [ ] 🟡 **treeMap 用 map 执行副作用** — `utils/list-util.ts` 用 `Array.map` 做遍历副作用，应用 `forEach`。
 
-### 2.1 持久化会话
-- [x] `ai_conversation` 表：id, title, user_id, model_id, system_prompt, created_time, updated_time ✔
-- [x] `ai_message` 表：id, conversation_id, role, content, tokens, created_time ✔
-- [x] 后端 Conversation CRUD Service + Controller ✔
-- [x] 前端对话历史从后端加载而非纯内存 ✔
+## G. 通用工程优化
 
-### 2.2 上下文窗口管理
-- [x] 根据模型的 `contextWindow` 进行 token 计数 ✔
-- [x] 超出窗口上限时自动截断（丢弃最早的消息） ✔
-- [x] 可选择摘要压缩策略（用 LLM 总结历史后再拼接） ✔
+- [ ] 🟡 **敏感配置硬编码** — `app.yml` 明文数据库密码、缺少 `myapp.ai.api-key-secret`，建议改为环境变量/外部密钥管理。
+- [ ] 🟡 **文件上传统一治理** — 上传（文档/音频/图片）缺统一的大小、类型、文件名净化与存储配额策略。
+- [ ] 🟡 **外部调用统一封装** — SSRF 防护、超时、大小限制、重试应抽公共 HTTP 客户端，避免各处散落 `HutoolHttp`/Jsoup 直连。
 
-### 2.3 会话导出 / 导入
-- [x] 导出为 Markdown / JSON / TXT（当前仅支持 JSON） ✔
-- [x] 从 JSON 导入恢复历史对话 ✔
-- [x] 分享对话（生成只读链接） ✔
-
----
-
-## 📚 Phase 3 — RAG / 知识库
-
-### 3.1 向量数据库接入
-- [x] 引入向量数据库依赖（pgvector / Milvus / Chroma） ✔
-- [x] 配置向量数据库连接 ✔
-- [x] 向量存取基础 Service 封装（`VectorStore`） ✔
-
-### 3.2 Embedding 模型接入
-- [x] 支持 DashScope 文本嵌入（`TextEmbeddingModel`） ✔
-- [x] 支持 OpenAI Embedding ✔
-- [x] `ai_embedding_model` 表管理嵌入模型配置 ✔
-- [x] Embedding API 端点 `POST /ai/embeddings` ✔
-
-### 3.3 文档管理
-- [x] `ai_document` 表：id, name, type(pdf/docx/txt/md), size, status, chunk_count ✔
-- [x] 文件上传接口（支持 PDF / DOCX / TXT / MD） ✔
-- [x] 文档解析服务（文本提取） ✔
-- [x] 文档分块策略配置（按大小 / 按段落 / 递归分割） ✔
-- [x] 分块入库（生成 Embedding 并存入向量库） ✔
-- [x] 前端文档管理页面（上传、列表、删除、重新索引） ✔
-
-### 3.4 知识库 QA
-- [x] `ai_knowledge_base` 表：id, name, description, model_id, chunk_size, overlap ✔
-- [x] 知识库与文档关联（多对多） ✔
-- [x] 检索策略（相似度 top-k、MMR、混合检索） ✔
-- [x] Rerank 重排序接入 ✔
-- [x] 引用来源展示（前端显示匹配的文档片段） ✔
-- [x] Chat 时自动检索知识库并注入上下文 ✔
-
-### 3.5 Web 爬取
-- [x] URL 内容抓取（JSOUP / web 爬虫） ✔
-- [x] 网页内容清洗（去除导航、广告） ✔
-- [x] 网页转文档入库 ✔
-
----
-
-## 🤖 Phase 4 — Agent / 工具调用
-
-### 4.1 Function Calling 基础
-- [x] 工具定义 Schema 接口（`ToolSpecification`） ✔
-- [x] 文本函数调用协议（JSON-based，兼容所有供应商） ✔
-- [x] 支持 OpenAI / Anthropic / Ollama / Gemini / DashScope / 自定义 ✔
-- [x] `ToolExecutor` 接口 + 反射自动注册 ✔
-- [x] `ToolSpecification` 定义工具 Schema ✔
-
-### 4.2 内置工具
-- [x] **计算器**（数学表达式求值，内置解析器，兼容 GraalVM JS） ✔
-- [x] **当前时间/日期**（时区感知） ✔
-- [x] **网页搜索**（Google / Bing Search API） ✔
-- [x] **知识库检索**（调用 RAG 能力） ✔
-- [x] **代码执行**（JavaScript 沙箱，支持 GraalVM JS） ✔
-- [x] **图片生成**（DALL-E 3） ✔
-- [x] **图片识别**（GPT-4V / GPT-4o） ✔
-- [x] **天气查询**（wttr.in） ✔
-
-### 4.3 自定义工具
-- [x] `ai_tool` 表：name, description, schema(json), url, auth_type, http_method ✔
-- [x] 用户可注册自定义 API 作为工具（支持 Bearer / Basic 认证） ✔
-- [x] 工具管理 CRUD 页面（含测试沙箱） ✔
-
-### 4.4 Agent 编排
-- [x] ReAct 模式 Agent 循环（SSE 流式） ✔
-- [x] `ai_agent` 表：name, description, model_id, tools[], system_prompt, max_iterations ✔
-- [x] Agent 运行日志与 Token 用量统计（`ai_agent_log` 表） ✔
-- [x] Agent 管理 CRUD 页面（关联工具） ✔
-- [x] Agent Chat UI（SSE 流式：thinking → tool_call → tool_result → content） ✔
-
----
-
-## 🎨 Phase 5 — 多模态
-
-### 5.1 图片生成
-- [x] 支持 DALL-E 3（OpenAI Image Model）
-- [x] 支持 Stable Diffusion（通过 API）
-- [x] 支持多模态模型生成图片（如 GPT-4o、Gemini 等，可配置）
-- [x] 图片生成模型配置管理（provider、model、apiKey、参数）
-- [x] 前端图片生成页面（prompt 输入、风格选择、尺寸选择、模型选择）
-- [x] 生成历史记录
-- [x] 生成的图片可引用到 Chat 中
-
-### 5.2 图片理解（Vision）
-- [x] Chat 中支持上传图片
-- [x] 多模态模型接入（GPT-4V、Qwen-VL、Claude 3、Gemini Pro Vision 等，可配置）
-- [x] 图片识别模型配置管理（provider、model、apiKey、参数）
-- [x] 图片 Base64 / URL 转 Message Content
-
-### 5.3 语音合成（TTS）
-- [x] OpenAI TTS / DashScope 语音合成接入
-- [x] 前端语音播放
-- [x] 对话内容转语音下载
-
-### 5.4 语音识别（STT）
-- [x] Whisper API 接入
-- [x] 前端语音录制上传
-- [x] Chat 语音输入
-
----
-
-## 🧩 Phase 6 — Prompt 管理
-
-### 6.1 提示词模板
-- [x] `ai_prompt_template` 表：name, content, variables[], category
-- [x] 模板变量替换引擎（`{{variable}}` 语法）
-- [x] 提示词模板 CRUD 页面
-
-### 6.2 系统提示词
-- [x] 对话级别 system prompt 编辑
-- [x] 预设 system prompt 快速选择
-- [x] 模型默认 system prompt 配置
-
-### 6.3 Prompt 版本管理
-- [x] 模板版本历史
-- [x] A/B 测试支持
-- [x] Prompt 效果评估
-
----
-
-## 🔐 Phase 7 — 管理与治理
-
-### 7.1 API Key 管理
-- [x] 用户级 API Key 生成（用于外部调用 AI 接口）
-- [x] Key 权限范围限制（可用模型、速率限制）
-- [x] Key 调用统计面板
-
-### 7.2 使用配额
-- [x] 用户/Key 级别速率限制（RPM / TPM）
-- [x] 月度 Token 配额
-- [x] 配额超限告警
-
-### 7.3 审计日志
-- [x] 所有 AI 请求记录到 `ai_audit_log` 表
-- [x] 记录：用户、模型、tokens、耗时、状态
-- [x] 审计日志查询页面
-
-### 7.4 内容安全
-- [x] 敏感词过滤
-- [x] 输入/输出内容审核（Moderation API）
-- [x] 拒绝策略配置（拦截/替换/警告）
-
----
-
-## 📊 Phase 8 — 监控与观测
-
-### 8.1 模型调用面板
-- [x] Token 使用趋势图（日/周/月）
-- [x] 模型调用次数排行
-- [x] 用户调用排行
-- [x] 平均响应延迟监控
-
-### 8.2 成本分析
-- [x] 按模型/用户/时间维度的花费统计
-- [x] 预算设置与超支告警
-- [x] 成本优化建议
-
-### 8.3 模型评估
-- [x] 在线模型测试/Playground
-- [x] 模型输出对比（并排对比不同模型回复）
-- [x] 评估数据集管理
-
----
-
-## 🏗 Phase 9 — 工程优化
-
-### 9.1 API Key 加密存储
-- [x] `ai_model_provider.apiKey` AES 加密存储 ✔
-- [x] 前端展示时脱敏（`sk-****...ab12`） ✔
-- [x] 密钥管理（密钥轮换） ✔
-
-### 9.2 性能优化
-- [x] 流式响应背压控制 ✔
-- [x] 模型实例缓存（减少重复构建 ChatModel） ✔
-- [x] 大文本分段处理 ✔
-
----
-
-## 技术栈决策备注
-| 模块 | 建议方案 |
-|------|----------|
-| 向量数据库 | pgvector（与现有 MySQL/PostgreSQL 配合） |
-| Embedding | DashScope Text-Embedding / OpenAI Embedding |
-| Rerank | Cohere Rerank / BGE Rerank |
-| 文档解析 | Apache Tika / PyMuPDF（PDF）/ Apache POI（DOCX） |
-| TTS / STT | OpenAI Whisper + TTS / DashScope 语音 |
-| Web 爬取 | Jsoup / Crawler4j |
-| 图片生成 | OpenAI DALL-E 3 / Stability AI |
-| Agent | langchain4j ToolSpecification + ToolExecution |

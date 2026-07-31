@@ -51,6 +51,7 @@ public class AiApiKeyController {
 
     @Mapping("/listByPage")
     @Post
+    @SaCheckRole(value = {"role:super:admin", "role:simple:admin"}, mode = SaMode.OR)
     public ApiResult<ApiPage<AiApiKeyVO>> listByPage(@Validated @Body AiApiKeyPageDTO pageDTO) {
         ApiPage<AiApiKeyVO> p = aiApiKeyService.listByPage(pageDTO);
         return ApiResult.ok(p);
@@ -58,6 +59,7 @@ public class AiApiKeyController {
 
     @Mapping("/usage/{apiKeyId}")
     @Get
+    @SaCheckRole(value = {"role:super:admin", "role:simple:admin"}, mode = SaMode.OR)
     public ApiResult<List<AiApiKeyUsageVO>> statRecent(@Param("apiKeyId") BigInteger apiKeyId,
                                                        @Param(value = "days", required = false) Integer days) {
         List<AiApiKeyUsageVO> list = aiApiKeyService.statRecent(apiKeyId, days);

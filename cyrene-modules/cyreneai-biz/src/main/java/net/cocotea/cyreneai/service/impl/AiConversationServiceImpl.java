@@ -1,5 +1,6 @@
 package net.cocotea.cyreneai.service.impl;
 
+import net.cocotea.cyreneadmin.model.BusinessException;
 import net.cocotea.cyreneai.model.po.AiConversation;
 import net.cocotea.cyreneai.model.po.AiMessage;
 import net.cocotea.cyreneai.service.AiConversationService;
@@ -22,6 +23,22 @@ public class AiConversationServiceImpl implements AiConversationService {
     private LightDao lightDao;
 
     private final Map<String, BigInteger> shareTokens = new ConcurrentHashMap<>();
+
+    @Override
+    public void checkOwnership(BigInteger conversationId, BigInteger userId) {
+        AiConversation conv = findById(conversationId);
+        if (conv == null || Integer.valueOf(1).equals(conv.getIsDeleted())) {
+            throw new BusinessException("会话不存在");
+        }
+        if (conv.getUserId() == null || !conv.getUserId().equals(userId)) {
+            throw new BusinessException("无权操作该会话");
+        }
+    }
+
+    @Override
+    public AiMessage findMessageById(BigInteger id) {
+        return lightDao.load(new AiMessage(id));
+    }
 
     @Override
     public AiMessage updateMessage(AiMessage message) {

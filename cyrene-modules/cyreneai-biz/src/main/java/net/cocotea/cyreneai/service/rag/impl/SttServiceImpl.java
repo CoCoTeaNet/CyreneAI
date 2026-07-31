@@ -14,6 +14,7 @@ import net.cocotea.cyreneai.model.dto.SttTranscribeDTO;
 import net.cocotea.cyreneai.model.po.AiModel;
 import net.cocotea.cyreneai.model.po.AiModelProvider;
 import net.cocotea.cyreneai.util.ApiKeyCipher;
+import net.cocotea.cyreneai.util.SafeHttpUtils;
 import net.cocotea.cyreneai.model.po.AiSttRecord;
 import net.cocotea.cyreneai.model.vo.AiSttModelVO;
 import net.cocotea.cyreneai.model.vo.AiSttRecordVO;
@@ -54,7 +55,8 @@ public class SttServiceImpl implements SttService {
 
         byte[] audioBytes;
         try {
-            audioBytes = HttpUtil.downloadBytes(dto.getAudioUrl());
+            // SSRF 防护 + 大小限制下载
+            audioBytes = SafeHttpUtils.downloadBytes(dto.getAudioUrl());
         } catch (Exception e) {
             throw new RuntimeException("下载音频文件失败: " + e.getMessage());
         }

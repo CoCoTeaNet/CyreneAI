@@ -9,6 +9,13 @@ import java.util.Map;
 
 public interface AiConversationService {
 
+    /**
+     * 校验会话归属：会话不存在或不属于指定用户时抛出业务异常
+     */
+    void checkOwnership(BigInteger conversationId, BigInteger userId);
+
+    AiMessage findMessageById(BigInteger id);
+
     AiConversation findById(BigInteger id);
 
     List<AiConversation> listByUserId(BigInteger userId);

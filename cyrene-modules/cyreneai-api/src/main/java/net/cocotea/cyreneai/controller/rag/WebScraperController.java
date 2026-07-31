@@ -1,5 +1,7 @@
 package net.cocotea.cyreneai.controller.rag;
 
+import cn.dev33.satoken.annotation.SaCheckRole;
+import cn.dev33.satoken.annotation.SaMode;
 import net.cocotea.cyreneai.model.dto.WebScraperDTO;
 import net.cocotea.cyreneai.service.rag.DocumentService;
 import net.cocotea.cyreneai.service.rag.WebScraperService;
@@ -29,6 +31,7 @@ public class WebScraperController {
 
     @Post
     @Mapping("/scrape")
+    @SaCheckRole(value = {"role:super:admin", "role:simple:admin"}, mode = SaMode.OR)
     public ApiResult<?> scrape(@Validated @Body WebScraperDTO dto) {
         try {
             WebScraperService.ScrapedResult result = webScraperService.scrape(dto.getUrl());
